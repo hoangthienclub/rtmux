@@ -1,0 +1,66 @@
+# =======================================================
+# RTMUX Desktop (Tauri + React + Vite) .gitignore
+# =======================================================
+
+# 1. Rust & Tauri Build Artifacts
+src-tauri/target/
+src-tauri/**/target/
+**/*.rs.bk
+
+# 2. Node & Frontend Build Outputs
+node_modules/
+dist/
+dist-build/
+bin/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# 3. Binaries, Archives & Installers
+*.exe
+*.dll
+*.so
+*.dylib
+*.zip
+*.tar.gz
+*.msi
+*.dmg
+*.deb
+*.AppImage
+
+# 4. Local Data & Symlinks
+data/
+service-data/
+service-backend
+*.db
+*.sqlite
+*.sqlite3
+*.local
+
+# 5. Environment Variables & Secrets
+.env
+.env.*
+*.env
+!*.env.example
+!.env.example
+
+# 6. Logs & Temp Files
+logs/
+*.log
+*.pid
+*.tmp
+*.temp
+
+# 7. OS & IDE Configuration
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.sublime-project
+*.sublime-workspace
