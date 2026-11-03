@@ -1,5 +1,5 @@
 // API Client & SSE Event Subscriber for Microservices Dev Engine
-const BASE_URL = 'http://127.0.0.1:48899';
+export const BASE_URL = 'http://127.0.0.1:48899';
 
 export async function ensureBackendRunning({ enableWsl = true, wslDistro = 'Ubuntu-24.04' } = {}) {
   if (window.__TAURI__?.invoke) {
@@ -35,14 +35,17 @@ async function request(path, options = {}) {
       },
       ...options
     });
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      throw new Error(errBody.error || `HTTP ${res.status}`);
+      return {
+        success: false,
+        error: data.error || `HTTP ${res.status}: ${res.statusText || 'Lỗi xử lý yêu cầu'}`
+      };
     }
-    return await res.json();
+    return data;
   } catch (err) {
     console.warn(`[Microservice API] ${path} failed:`, err.message);
-    return null;
+    return { success: false, error: `Không thể kết nối đến backend (Port 48899): ${err.message}` };
   }
 }
 
@@ -101,16 +104,69 @@ export async function createService(serviceData) {
 }
 
 export async function updateService(id, serviceData) {
-  return await request(`/api/services/${id}`, {
+  return await request(`/api/services/${encodeURIComponent(id)}`, {
     method: 'PUT',
     body: JSON.stringify(serviceData)
   });
 }
 
 export async function deleteService(id) {
-  return await request(`/api/services/${id}`, {
+  return await request(`/api/services/${encodeURIComponent(id)}`, {
     method: 'DELETE'
   });
+}
+
+export async function browseDirectory({ prompt = 'Chọn thư mục:', defaultDir = '', isWsl = false, wslDistro = 'Ubuntu' } = {}) {
+  return await request('/api/browse-directory', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, defaultDir, isWsl, wslDistro })
+  });
+}
+
+export function convertWindowsToWslPath(winPath, distro = 'Ubuntu-24.04') {
+  if (!winPath) return '';
+  let p = winPath.replace(/\\/g, '/');
+  
+  // 1. Check WSL UNC path: //wsl.localhost/<distro>/... or //wsl$/<distro>/...
+  const wslMatch = p.match(/^[/]{2}(?:wsl\.localhost|wsl\$)[/][^/]+(.*)$/i);
+  if (wslMatch) {
+    return wslMatch[1] || '/';
+  }
+
+  // 2. Check Z:/home/... or similar mapped network drive
+  if (/^[a-zA-Z]:[/]home[/]/i.test(p)) {
+    return p.replace(/^[a-zA-Z]:/i, '');
+  }
+
+  // 3. Drive letter: C:/... -> /mnt/c/...
+  const driveMatch = p.match(/^([a-zA-Z]):(.*)$/);
+  if (driveMatch) {
+    const driveLetter = driveMatch[1].toLowerCase();
+    const rest = driveMatch[2];
+    return `/mnt/${driveLetter}${rest}`;
+  }
+
+  return p;
+}
+
+export function convertWslToWindowsPath(linuxPath, distro = 'Ubuntu-24.04') {
+  if (!linuxPath) return '';
+  let p = linuxPath.replace(/\\/g, '/');
+
+  // 1. /mnt/c/... -> C:\...
+  const mntMatch = p.match(/^[/]mnt[/]([a-zA-Z])(.*)$/);
+  if (mntMatch) {
+    const driveLetter = mntMatch[1].toUpperCase();
+    const rest = mntMatch[2];
+    return `${driveLetter}:${rest}`.replace(/\//g, '\\');
+  }
+
+  // 2. /home/... or other Linux root paths -> \\wsl.localhost\<distro>\...
+  if (p.startsWith('/')) {
+    return `\\\\wsl.localhost\\${distro}${p.replace(/\//g, '\\')}`;
+  }
+
+  return linuxPath;
 }
 
 // 2. Batch Group Actions
@@ -243,7 +299,10 @@ export function subscribeMicroserviceEvents({
   onTaskStart,
   onTaskLog,
   onTaskFinish,
-  onServiceUpdated
+  onServiceUpdated,
+  onServicesUpdated,
+  onCategoriesUpdated,
+  onServiceDeleted
 }) {
   let eventSource = null;
   let isClosed = false;
@@ -314,6 +373,27 @@ export function subscribeMicroserviceEvents({
         try {
           const data = JSON.parse(e.data);
           if (onServiceUpdated) onServiceUpdated(data);
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener('services-updated', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (onServicesUpdated) onServicesUpdated(data);
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener('categories-updated', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (onCategoriesUpdated) onCategoriesUpdated(data);
+        } catch (_) {}
+      });
+
+      eventSource.addEventListener('service-deleted', (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (onServiceDeleted) onServiceDeleted(data);
         } catch (_) {}
       });
 

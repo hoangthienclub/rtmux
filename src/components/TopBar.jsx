@@ -1,9 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Play, 
-  Square, 
-  RotateCw, 
-  Zap, 
   FolderArchive, 
   ChevronDown,
   Monitor,
@@ -29,6 +25,7 @@ export default function TopBar({
   onStopAll,
   onRestartAll,
   onKillAll,
+  batchActionLoading = null,
   onRefresh,
   isRefreshing,
   onOpenSettings,
@@ -184,54 +181,6 @@ export default function TopBar({
             <span className="hidden sm:inline">{enableWsl ? `${t.wslEnabled || 'WSL'}: ${wslDistro || 'Ubuntu'}` : (t.winNative || 'Windows Native')}</span>
           </button>
         )}
-
-        {/* Microservices Action Controls Segment */}
-        <div 
-          className="flex items-center p-0.5 rounded-lg border gap-0.5 flex-shrink-0"
-          style={{
-            backgroundColor: currentThemeConfig.innerInput,
-            borderColor: currentThemeConfig.border
-          }}
-        >
-          {/* Start All ▶ */}
-          <button
-            onClick={onStartAll}
-            title={t.startAll || 'Khởi động tất cả dịch vụ'}
-            className="h-6 px-2 rounded text-white flex items-center justify-center transition-all shadow-sm active:scale-95 text-xs font-semibold gap-1"
-            style={{ backgroundColor: accentColor }}
-          >
-            <Play size={10} className="fill-current" />
-            <span className="hidden 2xl:inline text-[11px]">Start All</span>
-          </button>
-
-          {/* Restart All ↺ */}
-          <button
-            onClick={onRestartAll}
-            title={t.restartAll || 'Khởi động lại tất cả'}
-            className="w-6 h-6 rounded flex items-center justify-center transition-all hover:bg-white/10 active:scale-95"
-            style={{ color: currentThemeConfig.text }}
-          >
-            <RotateCw size={11} />
-          </button>
-
-          {/* Stop All ■ */}
-          <button
-            onClick={onStopAll}
-            title={t.stopAll || 'Dừng tất cả dịch vụ'}
-            className="w-6 h-6 rounded text-rose-400 hover:bg-rose-500/20 flex items-center justify-center transition-all active:scale-95"
-          >
-            <Square size={10} className="fill-current" />
-          </button>
-
-          {/* Kill All Ports ⚡ */}
-          <button
-            onClick={onKillAll}
-            title={t.killPorts || 'Giải phóng tất cả các cổng mạng'}
-            className="w-6 h-6 rounded text-amber-400 hover:bg-amber-500/20 flex items-center justify-center transition-all active:scale-95"
-          >
-            <Zap size={11} />
-          </button>
-        </div>
 
         {/* Backup / Restore Button */}
         <button

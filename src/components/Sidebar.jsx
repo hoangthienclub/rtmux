@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard,
   Server,
   UserCheck,
   KeyRound,
@@ -20,7 +19,8 @@ import {
   Boxes,
   FileCode2,
   Sparkles,
-  ShieldCheck
+  ShieldCheck,
+  Play
 } from 'lucide-react';
 import { translations } from '../i18n/translations';
 import { THEME_CONFIGS } from '../constants/palettes';
@@ -142,23 +142,126 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* 1. TOP SINGLE ITEM: DASHBOARD */}
-        <button
-          onClick={() => onSelectNav('dashboard')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
-          style={getItemStyle(currentNav === 'dashboard')}
-        >
-          <LayoutDashboard size={15} style={{ color: currentNav === 'dashboard' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
-          <span>{t.dashboard || 'Dashboard'}</span>
-        </button>
+        {/* 1. TOP PRIORITY GROUP: MICROSERVICES DEV (EXPANDED BY DEFAULT) */}
+        <div className="space-y-1">
+          <button
+            onClick={toggleServices}
+            className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer"
+            style={{ color: accentColor }}
+          >
+            <div className="flex items-center gap-1.5">
+              <Layers size={13} style={{ color: accentColor }} />
+              <span>{t.microservicesDev || 'Microservices Dev'}</span>
+            </div>
+            <div className="flex items-center gap-1" style={{ color: currentThemeConfig.textMuted }}>
+              <span className="text-[9.5px] font-mono lowercase">{runningCount}/{totalCount}</span>
+              {isOpenServices ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
+            </div>
+          </button>
 
-        {/* 2. GROUP: RESOURCES */}
+          {isOpenServices && (
+            <div className="space-y-0.5 pl-0.5 animate-in fade-in duration-150">
+              {/* Giám Sát Services */}
+              <button
+                onClick={() => onSelectNav('services')}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={getItemStyle(currentNav === 'services')}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Play size={15} style={{ color: currentNav === 'services' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
+                  <span className="truncate">{t.serviceMonitor || 'Giám Sát Services'}</span>
+                </div>
+                {renderCountBadge(`${runningCount}/${totalCount}`, runningCount > 0)}
+              </button>
+
+              {/* Quản Lý Services */}
+              <button
+                onClick={() => onSelectNav('manage_services')}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={getItemStyle(currentNav === 'manage_services')}
+              >
+                <Boxes size={15} style={{ color: currentNav === 'manage_services' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
+                <span className="truncate">{t.manageServices || 'Quản Lý Services'}</span>
+              </button>
+
+              {/* Biến Môi Trường */}
+              <button
+                onClick={() => onSelectNav('env_vars')}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={getItemStyle(currentNav === 'env_vars')}
+              >
+                <Sliders size={15} style={{ color: currentNav === 'env_vars' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
+                <span className="truncate">{t.envVars || 'Biến Môi Trường'}</span>
+              </button>
+
+              {/* Danh Mục */}
+              <button
+                onClick={() => onSelectNav('categories')}
+                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={getItemStyle(currentNav === 'categories')}
+              >
+                <Tag size={15} style={{ color: currentNav === 'categories' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
+                <span className="truncate">{t.categories || 'Danh Mục'}</span>
+              </button>
+
+              {/* Quản Lý Scripts */}
+              <button
+                onClick={() => onSelectNav('scripts')}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
+                style={getItemStyle(currentNav === 'scripts')}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <FileCode2 size={15} style={{ color: currentNav === 'scripts' ? accentColor : '#f97316' }} />
+                  <span className="truncate">{t.scripts || 'Quản Lý Scripts'}</span>
+                </div>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* 2. GROUP: DEVOPS & DOCKER */}
         <div className="space-y-1">
           <div
             className="px-2 text-[10px] font-bold uppercase tracking-widest font-sans"
             style={{ color: currentThemeConfig.textMuted }}
           >
-            {t.resources || 'RESOURCES'}
+            {t.devops || 'DEVOPS & DOCKER'}
+          </div>
+          <div className="space-y-0.5">
+            {/* Docker */}
+            <button
+              onClick={() => onSelectNav('docker')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
+              style={getItemStyle(currentNav === 'docker')}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Box size={15} style={{ color: currentNav === 'docker' ? accentColor : '#38bdf8' }} />
+                <span className="truncate">{t.docker || 'Docker'}</span>
+              </div>
+            </button>
+
+            {/* Port Forwarding */}
+            <button
+              onClick={() => onSelectNav('port_forward')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
+              style={getItemStyle(currentNav === 'port_forward')}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <ArrowLeftRight size={15} style={{ color: currentNav === 'port_forward' ? accentColor : '#34d399' }} />
+                <span className="truncate">{t.portForwarding || 'Chuyển Cổng'}</span>
+              </div>
+              {renderCountBadge(tunnelsCount)}
+            </button>
+          </div>
+        </div>
+
+        {/* 3. GROUP: SSH & TÀI NGUYÊN (RESOURCES) */}
+        <div className="space-y-1">
+          <div
+            className="px-2 text-[10px] font-bold uppercase tracking-widest font-sans"
+            style={{ color: currentThemeConfig.textMuted }}
+          >
+            {t.resources || 'SSH & TÀI NGUYÊN'}
           </div>
           <div className="space-y-0.5">
             {/* Machine */}
@@ -172,6 +275,18 @@ export default function Sidebar({
                 <span className="truncate">{t.machine || 'Máy Chủ'}</span>
               </div>
               {renderCountBadge(machinesCount)}
+            </button>
+
+            {/* SFTP */}
+            <button
+              onClick={() => onSelectNav('sftp')}
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
+              style={getItemStyle(currentNav === 'sftp')}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <FolderSync size={15} style={{ color: currentNav === 'sftp' ? accentColor : '#f59e0b' }} />
+                <span className="truncate">{t.sftp || 'Truyền Tệp SFTP'}</span>
+              </div>
             </button>
 
             {/* Identity */}
@@ -212,29 +327,6 @@ export default function Sidebar({
               </div>
               {renderCountBadge(proxiesCount)}
             </button>
-          </div>
-        </div>
-
-        {/* 3. GROUP: TOOLBOX */}
-        <div className="space-y-1">
-          <div
-            className="px-2 text-[10px] font-bold uppercase tracking-widest font-sans"
-            style={{ color: currentThemeConfig.textMuted }}
-          >
-            {t.toolbox || 'HỘP CÔNG CỤ'}
-          </div>
-          <div className="space-y-0.5">
-            {/* SFTP */}
-            <button
-              onClick={() => onSelectNav('sftp')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
-              style={getItemStyle(currentNav === 'sftp')}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <FolderSync size={15} style={{ color: currentNav === 'sftp' ? accentColor : '#f59e0b' }} />
-                <span className="truncate">{t.sftp || 'Truyền Tệp SFTP'}</span>
-              </div>
-            </button>
 
             {/* Snippet */}
             <button
@@ -247,102 +339,7 @@ export default function Sidebar({
                 <span className="truncate">{t.snippet || 'Đoạn Lệnh'}</span>
               </div>
             </button>
-
-            {/* Scripts (Tự động hóa) */}
-            <button
-              onClick={() => onSelectNav('scripts')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
-              style={getItemStyle(currentNav === 'scripts')}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <FileCode2 size={15} style={{ color: currentNav === 'scripts' ? accentColor : '#f97316' }} />
-                <span className="truncate">{t.scripts || 'Quản Lý Scripts'}</span>
-              </div>
-            </button>
-
-            {/* Docker */}
-            <button
-              onClick={() => onSelectNav('docker')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
-              style={getItemStyle(currentNav === 'docker')}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Box size={15} style={{ color: currentNav === 'docker' ? accentColor : '#38bdf8' }} />
-                <span className="truncate">{t.docker || 'Docker'}</span>
-              </div>
-            </button>
-
-            {/* Port Forwarding */}
-            <button
-              onClick={() => onSelectNav('port_forward')}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
-              style={getItemStyle(currentNav === 'port_forward')}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <ArrowLeftRight size={15} style={{ color: currentNav === 'port_forward' ? accentColor : '#34d399' }} />
-                <span className="truncate">{t.portForwarding || 'Chuyển Cổng'}</span>
-              </div>
-              {renderCountBadge(tunnelsCount)}
-            </button>
           </div>
-        </div>
-
-        {/* 4. GROUP: MICROSERVICES DEV (COLLAPSIBLE) */}
-        <div className="space-y-1">
-          <button
-            onClick={toggleServices}
-            className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors"
-            style={{ color: accentColor }}
-          >
-            <span>{t.microservicesDev || 'Microservices Dev'}</span>
-            <div className="flex items-center gap-1" style={{ color: currentThemeConfig.textMuted }}>
-              <span className="text-[9.5px] font-mono lowercase">{runningCount}/{totalCount}</span>
-              {isOpenServices ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
-            </div>
-          </button>
-
-          {isOpenServices && (
-            <div className="space-y-0.5 pl-0.5 animate-in fade-in duration-150">
-              <button
-                onClick={() => onSelectNav('services')}
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all"
-                style={getItemStyle(currentNav === 'services')}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <Layers size={15} style={{ color: currentNav === 'services' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
-                  <span className="truncate">{t.serviceMonitor || 'Giám Sát Services'}</span>
-                </div>
-                {renderCountBadge(`${runningCount}/${totalCount}`, runningCount > 0)}
-              </button>
-
-              <button
-                onClick={() => onSelectNav('env_vars')}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
-                style={getItemStyle(currentNav === 'env_vars')}
-              >
-                <Sliders size={15} style={{ color: currentNav === 'env_vars' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
-                <span className="truncate">{t.envVars || 'Biến Môi Trường'}</span>
-              </button>
-
-              <button
-                onClick={() => onSelectNav('categories')}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
-                style={getItemStyle(currentNav === 'categories')}
-              >
-                <Tag size={15} style={{ color: currentNav === 'categories' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
-                <span className="truncate">{t.categories || 'Danh Mục'}</span>
-              </button>
-
-              <button
-                onClick={() => onSelectNav('manage_services')}
-                className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium transition-all"
-                style={getItemStyle(currentNav === 'manage_services')}
-              >
-                <Boxes size={15} style={{ color: currentNav === 'manage_services' ? accentColor : (currentThemeConfig.textMuted || '#64748b') }} />
-                <span className="truncate">{t.manageServices || 'Quản Lý Services'}</span>
-              </button>
-            </div>
-          )}
         </div>
 
         {/* 5. GROUP: TERMINAL (WITH + BUTTON MATCHING SCREENSHOT) */}

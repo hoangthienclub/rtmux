@@ -1,18 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Code2, 
   Plus, 
-  Play, 
   Copy, 
   Trash2, 
   Check, 
   Tag, 
-  Terminal,
   Search,
-  Server,
   X,
   LayoutList,
-  LayoutGrid
+  LayoutGrid,
+  Download,
+  Upload,
+  FileText,
+  AlertCircle
 } from 'lucide-react';
 
 import { THEME_CONFIGS } from '../../constants/palettes';
@@ -71,7 +72,7 @@ const INITIAL_SNIPPETS = [
   },
 ];
 
-export default function SnippetsView({ onRunSnippet, machines = [], settings }) {
+export default function SnippetsView({ settings }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
   const accentColor = settings?.accentColor || '#10b981';
   const [snippets, setSnippets] = useState(() => {
@@ -85,7 +86,6 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [selectedMachineId, setSelectedMachineId] = useState(machines[0]?.id || 'clt_dev1');
   const [viewMode, setViewMode] = useState(() => {
     try {
       return localStorage.getItem('service_tool_snippets_view_mode') || 'list';
@@ -101,21 +101,34 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
     } catch (_) {}
   };
 
-  // Modal
+  // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
+  const [importMode, setImportMode] = useState('merge'); // 'merge' or 'overwrite'
+  const [importError, setImportError] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const fileInputRef = useRef(null);
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 3000);
+  };
 
   useEffect(() => {
-    if (!isAddModalOpen) return;
+    if (!isAddModalOpen && !isImportModalOpen) return;
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         setIsAddModalOpen(false);
+        setIsImportModalOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isAddModalOpen]);
+  }, [isAddModalOpen, isImportModalOpen]);
+
   const [snippetToDelete, setSnippetToDelete] = useState(null);
   const [newName, setNewName] = useState('');
   const [newCommand, setNewCommand] = useState('');
@@ -140,6 +153,7 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
   const handleDelete = (id) => {
     const next = snippets.filter((s) => s.id !== id);
     saveSnippets(next);
+    showToast('Đã xóa snippet thành công');
   };
 
   const handleCreate = (e) => {
@@ -159,12 +173,98 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
     setNewCommand('');
     setNewDescription('');
     setIsAddModalOpen(false);
+    showToast(`Đã thêm snippet "${newSnippet.name}"`);
   };
 
-  const handleExecute = (cmd) => {
-    const targetMachine = machines.find((m) => m.id === selectedMachineId) || machines[0];
-    if (onRunSnippet) {
-      onRunSnippet(cmd, targetMachine);
+  // Export Snippets to JSON
+  const handleExportJson = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(snippets, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const dateStr = new Date().toISOString().slice(0, 10);
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `snippets-backup-${dateStr}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast(`Đã xuất ${snippets.length} snippets ra file JSON`);
+    } catch (e) {
+      console.error('Export failed:', e);
+      showToast('Lỗi khi xuất file: ' + e.message);
+    }
+  };
+
+  // Handle file input for Import
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result;
+      if (typeof content === 'string') {
+        setImportJsonText(content);
+        setImportError('');
+      }
+    };
+    reader.onerror = () => {
+      setImportError('Không thể đọc file đã chọn.');
+    };
+    reader.readAsText(file);
+    // Reset file input so same file can be selected again
+    e.target.value = '';
+  };
+
+  // Process Import Confirmation
+  const handleConfirmImport = () => {
+    setImportError('');
+    if (!importJsonText.trim()) {
+      setImportError('Vui lòng chọn file JSON hoặc dán nội dung JSON vào khung nhập.');
+      return;
+    }
+
+    try {
+      let parsed = JSON.parse(importJsonText.trim());
+      // Support { snippets: [...] } or direct array [...]
+      if (!Array.isArray(parsed) && parsed && Array.isArray(parsed.snippets)) {
+        parsed = parsed.snippets;
+      }
+
+      if (!Array.isArray(parsed)) {
+        setImportError('Dữ liệu JSON không hợp lệ. Phải là một mảng danh sách các snippet.');
+        return;
+      }
+
+      const validList = parsed.filter(item => item && (item.command || item.cmd) && (item.name || item.title)).map((item, idx) => ({
+        id: item.id || `imported_${Date.now()}_${idx}`,
+        name: String(item.name || item.title || 'Snippet Không Tên').trim(),
+        command: String(item.command || item.cmd || '').trim(),
+        category: String(item.category || item.group || 'System').trim(),
+        description: String(item.description || item.desc || '').trim()
+      }));
+
+      if (validList.length === 0) {
+        setImportError('Không tìm thấy snippet hợp lệ nào (mỗi snippet cần có "name" và "command").');
+        return;
+      }
+
+      let finalList = [];
+      if (importMode === 'overwrite') {
+        finalList = validList;
+      } else {
+        // Merge mode: append new snippets that don't match existing name & command
+        const existingMap = new Set(snippets.map(s => `${s.name.toLowerCase()}:::${s.command.trim()}`));
+        const newUnique = validList.filter(s => !existingMap.has(`${s.name.toLowerCase()}:::${s.command.trim()}`));
+        finalList = [...snippets, ...newUnique];
+      }
+
+      saveSnippets(finalList);
+      setIsImportModalOpen(false);
+      setImportJsonText('');
+      setImportError('');
+      showToast(`Đã nhập thành công ${validList.length} snippets (${importMode === 'overwrite' ? 'Ghi đè' : 'Gộp thêm'})`);
+    } catch (err) {
+      setImportError('Cú pháp JSON không hợp lệ: ' + err.message);
     }
   };
 
@@ -179,6 +279,23 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
 
   return (
     <div className="flex-1 p-6 overflow-y-auto space-y-6 custom-scroll bg-[#070b14]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium text-xs shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <Check size={14} className="text-white" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
+
+      {/* Hidden File Input for Import */}
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        accept=".json" 
+        onChange={handleFileChange} 
+        style={{ display: 'none' }} 
+      />
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#161e2e]">
         <div>
@@ -187,29 +304,11 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
             <span>Snippets (Kho Đoạn Lệnh & Kịch Bản Nhanh) ({snippets.length})</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Lưu trữ câu lệnh thường dùng, chạy trực tiếp vào SSH Terminal của máy chủ đã chọn hoặc copy 1 click.
+            Lưu trữ câu lệnh thường dùng, quản lý, sao lưu Import / Export và sao chép 1-click.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          {/* Target Host Select */}
-          {machines.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-[#0c101c] border border-[#1a2438] rounded-xl px-2.5 py-1">
-              <Server size={12} className="text-emerald-400" />
-              <select
-                value={selectedMachineId}
-                onChange={(e) => setSelectedMachineId(e.target.value)}
-                className="bg-transparent text-xs text-white font-mono focus:outline-none"
-              >
-                {machines.map((m) => (
-                  <option key={m.id} value={m.id} className="bg-[#0c101c]">
-                    Chạy trên: {m.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
+        <div className="flex items-center gap-2 flex-wrap">
           {/* View Mode Toggle: List vs Grid */}
           <div className="flex items-center p-0.5 rounded-xl border border-[#1a2438] bg-[#0c101c]">
             <button
@@ -236,6 +335,7 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
             </button>
           </div>
 
+          {/* Search Box */}
           <div className="relative">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
@@ -243,13 +343,38 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm câu lệnh..."
-              className="w-48 h-8 bg-[#0c101c] border border-[#1a2438] rounded-xl pl-8 pr-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
+              className="w-40 sm:w-48 h-8 bg-[#0c101c] border border-[#1a2438] rounded-xl pl-8 pr-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
             />
           </div>
 
+          {/* Export JSON Button */}
+          <button
+            onClick={handleExportJson}
+            className="flex items-center gap-1.5 h-8 px-2.5 bg-[#0c101c] hover:bg-[#161f30] border border-[#1a2438] text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+            title="Xuất danh sách snippets ra file JSON"
+          >
+            <Download size={13} className="text-sky-400" />
+            <span>Export JSON</span>
+          </button>
+
+          {/* Import JSON Button */}
+          <button
+            onClick={() => {
+              setImportJsonText('');
+              setImportError('');
+              setIsImportModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 h-8 px-2.5 bg-[#0c101c] hover:bg-[#161f30] border border-[#1a2438] text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+            title="Nhập snippets từ file JSON hoặc dán text"
+          >
+            <Upload size={13} className="text-amber-400" />
+            <span>Import JSON</span>
+          </button>
+
+          {/* Add Snippet Button */}
           <button
             onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center gap-1.5 h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] active:scale-95"
+            className="flex items-center gap-1.5 h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-xl transition-all shadow-[0_0_12px_rgba(16,185,129,0.25)] active:scale-95 cursor-pointer"
           >
             <Plus size={14} />
             <span>Thêm Snippet</span>
@@ -314,28 +439,20 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
                 <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleCopy(s.id, s.command)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-[#101626] hover:bg-[#18233c] border border-[#1c2942] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all"
-                    title="Copy command"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#101626] hover:bg-[#18233c] border border-[#1c2942] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm"
+                    title="Sao chép câu lệnh"
                   >
                     {copiedId === s.id ? (
                       <>
                         <Check size={12} className="text-emerald-400" />
-                        <span className="text-emerald-400 text-[11px]">Đã chép</span>
+                        <span className="text-emerald-400 text-[11px] font-semibold">Đã chép</span>
                       </>
                     ) : (
                       <>
                         <Copy size={12} />
-                        <span className="text-[11px]">Copy</span>
+                        <span className="text-[11px]">Copy Lệnh</span>
                       </>
                     )}
-                  </button>
-                  <button
-                    onClick={() => handleExecute(s.command)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
-                    title="Chạy trên terminal máy chủ"
-                  >
-                    <Play size={11} className="fill-white" />
-                    <span className="text-[11px]">Chạy</span>
                   </button>
                   <TableActionButton
                     icon={Trash2}
@@ -354,7 +471,7 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
           footer={(
             <div className="flex items-center justify-between w-full">
               <span>Tổng: <strong style={{ color: currentThemeConfig.text }}>{filteredSnippets.length}</strong> lệnh snippets</span>
-              <span className="text-[11px] text-slate-500">Bấm Chạy để gửi lệnh trực tiếp vào Terminal</span>
+              <span className="text-[11px] text-slate-500">Bấm Copy để sao chép nhanh câu lệnh vào clipboard</span>
             </div>
           )}
         />
@@ -396,42 +513,184 @@ export default function SnippetsView({ onRunSnippet, machines = [], settings }) 
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-[#141b2c]">
+              <div className="flex items-center justify-between pt-2.5 border-t border-[#141b2c]">
                 <span className="text-[10.5px] text-slate-500 font-sans">
-                  Chạy ngay vào Terminal
+                  Sao chép 1-click & sử dụng
                 </span>
 
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleCopy(s.id, s.command)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-[#101626] hover:bg-[#18233c] border border-[#1c2942] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#101626] hover:bg-[#18233c] border border-[#1c2942] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm"
                     title="Copy command to clipboard"
                   >
                     {copiedId === s.id ? (
                       <>
                         <Check size={12} className="text-emerald-400" />
-                        <span className="text-emerald-400 text-[11px]">Đã chép</span>
+                        <span className="text-emerald-400 text-[11px] font-semibold">Đã chép</span>
                       </>
                     ) : (
                       <>
                         <Copy size={12} />
-                        <span className="text-[11px]">Copy</span>
+                        <span className="text-[11px]">Copy Lệnh</span>
                       </>
                     )}
-                  </button>
-
-                  <button
-                    onClick={() => handleExecute(s.command)}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
-                    title="Chạy trên terminal máy chủ"
-                  >
-                    <Play size={12} className="fill-white" />
-                    <span className="text-[11px]">Chạy Terminal</span>
                   </button>
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Import Snippets Modal */}
+      {isImportModalOpen && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-150"
+          onClick={() => setIsImportModalOpen(false)}
+        >
+          <div 
+            className="bg-[#121622] border border-[#1e2638] rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-[#1c2436]">
+              <div className="flex items-center gap-2">
+                <Upload size={18} className="text-amber-400" />
+                <h3 className="font-bold text-base text-white">Import Danh Sách Snippets</h3>
+              </div>
+              <button
+                onClick={() => setIsImportModalOpen(false)}
+                className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-[#1a2336] cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* File Upload Trigger */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[#090d16] border border-[#1e273a]">
+              <div>
+                <div className="text-xs font-semibold text-white">Tải lên từ file .JSON</div>
+                <div className="text-[11px] text-slate-400">Chọn file sao lưu backup snippets có sẵn trên máy</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold rounded-lg transition-all shadow-sm active:scale-95 cursor-pointer"
+              >
+                <FileText size={13} />
+                <span>Chọn File JSON</span>
+              </button>
+            </div>
+
+            {/* Paste JSON Text Area */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-medium text-slate-300">
+                  Hoặc dán nội dung JSON vào đây:
+                </label>
+                {importJsonText && (
+                  <button
+                    type="button"
+                    onClick={() => setImportJsonText('')}
+                    className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                  >
+                    Xóa trắng
+                  </button>
+                )}
+              </div>
+              <textarea
+                rows={6}
+                value={importJsonText}
+                onChange={(e) => {
+                  setImportJsonText(e.target.value);
+                  setImportError('');
+                }}
+                placeholder={`[\n  {\n    "name": "Check Docker",\n    "command": "docker ps",\n    "category": "Docker"\n  }\n]`}
+                className="w-full bg-[#090d16] border border-[#1e273a] rounded-xl p-3 text-xs text-emerald-400 placeholder-slate-600 font-mono focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Import Mode Options */}
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-2">
+                Chế độ nhập dữ liệu:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label 
+                  className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                    importMode === 'merge' 
+                      ? 'bg-emerald-950/30 border-emerald-500/50 text-white' 
+                      : 'bg-[#090d16] border-[#1e273a] text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="merge"
+                    checked={importMode === 'merge'}
+                    onChange={() => setImportMode('merge')}
+                    className="mt-0.5 accent-emerald-500"
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-white">Gộp thêm (Merge)</div>
+                    <div className="text-[10.5px] text-slate-400 leading-snug mt-0.5">
+                      Giữ nguyên {snippets.length} snippets hiện có, chỉ thêm các snippet mới.
+                    </div>
+                  </div>
+                </label>
+
+                <label 
+                  className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                    importMode === 'overwrite' 
+                      ? 'bg-rose-950/30 border-rose-500/50 text-white' 
+                      : 'bg-[#090d16] border-[#1e273a] text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="importMode"
+                    value="overwrite"
+                    checked={importMode === 'overwrite'}
+                    onChange={() => setImportMode('overwrite')}
+                    className="mt-0.5 accent-rose-500"
+                  />
+                  <div>
+                    <div className="text-xs font-bold text-white">Ghi đè tất cả (Replace)</div>
+                    <div className="text-[10.5px] text-slate-400 leading-snug mt-0.5">
+                      Thay thế toàn bộ kho hiện tại bằng danh sách mới từ file nhập.
+                    </div>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {importError && (
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-rose-300 text-xs font-mono">
+                <AlertCircle size={14} className="flex-shrink-0 text-rose-400" />
+                <span>{importError}</span>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-2.5 pt-3 border-t border-[#1c2436]">
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(false)}
+                className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl hover:bg-[#1a2336] transition-all cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-[0_0_12px_rgba(245,158,11,0.3)] transition-all cursor-pointer active:scale-95"
+              >
+                <Upload size={13} />
+                <span>Xác Nhận Import</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

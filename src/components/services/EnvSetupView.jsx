@@ -23,10 +23,43 @@ import {
   Edit3
 } from 'lucide-react';
 import { THEME_CONFIGS } from '../../constants/palettes';
+import { BASE_URL } from '../../services/microserviceClient';
 import BackupRestoreModal from './BackupRestoreModal';
+import ConfirmModal from '../common/ConfirmModal';
 
 // ================= COPY FROM MODAL =================
 function CopyFromEnvModal({ isOpen, onClose, services = [], activeTab, currentProfileKey, globalEnvPairs = [], onApply, currentThemeConfig = {}, accentColor = '#10b981' }) {
+  const sources = useMemo(() => {
+    return [
+      { id: 'global', label: '🌍 Global Shared Config', env: Object.fromEntries((globalEnvPairs || []).map(p => [p.key, p.value])) },
+      ...(services || []).flatMap(s => {
+        return Object.entries(s.profiles || {}).map(([pKey, pVal]) => ({
+          id: `${s.id}:::${pKey}`,
+          label: `🧩 ${s.name} (Profile: ${pKey})`,
+          env: pVal?.env || {}
+        }));
+      })
+    ].filter(src => {
+      if (activeTab === 'global' && src.id === 'global') return false;
+      if (src.id === `${activeTab}:::${currentProfileKey}`) return false;
+      return true;
+    });
+  }, [globalEnvPairs, services, activeTab, currentProfileKey]);
+
+  const [selectedSourceId, setSelectedSourceId] = useState('');
+  const [copyMode, setCopyMode] = useState('overwrite'); // 'overwrite' | 'merge'
+  const [copyError, setCopyError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      if (sources.length > 0 && (!selectedSourceId || !sources.some(s => s.id === selectedSourceId))) {
+        setSelectedSourceId(sources[0].id);
+      }
+      setCopyMode('overwrite');
+      setCopyError('');
+    }
+  }, [isOpen, sources]);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -42,33 +75,16 @@ function CopyFromEnvModal({ isOpen, onClose, services = [], activeTab, currentPr
 
   if (!isOpen) return null;
 
-  const sources = [
-    { id: 'global', label: '🌍 Global Shared Config', env: Object.fromEntries(globalEnvPairs.map(p => [p.key, p.value])) },
-    ...services.flatMap(s => {
-      return Object.entries(s.profiles || {}).map(([pKey, pVal]) => ({
-        id: `${s.id}:::${pKey}`,
-        label: `🧩 ${s.name} (Profile: ${pKey})`,
-        env: pVal?.env || {}
-      }));
-    })
-  ].filter(src => {
-    if (activeTab === 'global' && src.id === 'global') return false;
-    if (src.id === `${activeTab}:::${currentProfileKey}`) return false;
-    return true;
-  });
-
-  const [selectedSourceId, setSelectedSourceId] = useState(sources[0]?.id || '');
-  const [copyMode, setCopyMode] = useState('overwrite'); // 'overwrite' | 'merge'
-
   const currentSource = sources.find(s => s.id === selectedSourceId);
   const sourceEnv = currentSource?.env || {};
   const sourceCount = Object.keys(sourceEnv).length;
 
   const handleConfirm = () => {
     if (!sourceEnv || Object.keys(sourceEnv).length === 0) {
-      alert('Nguồn này không có biến môi trường nào để sao chép!');
+      setCopyError('Nguồn này không có biến môi trường nào để sao chép!');
       return;
     }
+    setCopyError('');
     onApply(sourceEnv, copyMode);
   };
 
@@ -236,6 +252,7 @@ function ImportJsonEnvModal({
   const [parsedEnv, setParsedEnv] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
   const [fileName, setFileName] = useState('');
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -329,9 +346,10 @@ function ImportJsonEnvModal({
 
   const handleApply = () => {
     if (!parsedEnv || parsedEnv.length === 0) {
-      alert('Vui lòng chọn hoặc nhập file JSON hợp lệ trước khi áp dụng!');
+      setImportError('Vui lòng chọn hoặc nhập file JSON hợp lệ trước khi áp dụng!');
       return;
     }
+    setImportError('');
     onApplyImport(parsedEnv, importMode);
   };
 
@@ -910,6 +928,7 @@ export default function EnvSetupView({
   const [showCopyFromModal, setShowCopyFromModal] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [showImportJsonModal, setShowImportJsonModal] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   useEffect(() => {
     if (!showNewProfileModal && !showCopyFromModal && !isBackupModalOpen && !showImportJsonModal && !editingProfile) return;
@@ -930,7 +949,7 @@ export default function EnvSetupView({
 
   // Fetch global env from server on mount
   useEffect(() => {
-    fetch('/api/global-env')
+    fetch(`${BASE_URL}/api/global-env`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -949,7 +968,7 @@ export default function EnvSetupView({
 
   const handleChangeGlobalProfile = async (profileKey) => {
     try {
-      const res = await fetch('/api/global-env/active-profile', {
+      const res = await fetch(`${BASE_URL}/api/global-env/active-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profile: profileKey })
@@ -969,8 +988,10 @@ export default function EnvSetupView({
   };
 
   const currentService = services.find(s => s.id === activeTab);
-  const profileKeys = Object.keys(currentService?.profiles || {});
-  const activeProfileKey = currentService?.activeProfile || profileKeys[0] || 'default';
+  const centralProfileKeys = Object.keys(globalProfiles || {});
+  const serviceProfileKeys = Object.keys(currentService?.profiles || {});
+  const profileKeys = centralProfileKeys.length > 0 ? centralProfileKeys : (serviceProfileKeys.length > 0 ? serviceProfileKeys : ['default']);
+  const activeProfileKey = currentService?.activeProfile || (profileKeys.includes('default') ? 'default' : profileKeys[0]);
 
   const getStorageKey = (tab, profile) => `service_tool_saved_env_${tab}_${profile}`;
 
@@ -1098,7 +1119,8 @@ export default function EnvSetupView({
 
   const handleCopyAllEnv = () => {
     if (envPairs.length === 0) {
-      alert('Không có biến nào để sao chép!');
+      setSaveStatus('⚠️ Không có biến nào để sao chép!');
+      setTimeout(() => setSaveStatus(''), 2000);
       return;
     }
     const text = envPairs.map(p => `${p.key}=${p.value}`).join('\n');
@@ -1165,7 +1187,7 @@ export default function EnvSetupView({
 
     if (activeTab === 'global') {
       try {
-        const res = await fetch('/api/global-env', {
+        const res = await fetch(`${BASE_URL}/api/global-env`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ globalVars: overrides, profileKey: activeGlobalProfile })
@@ -1192,7 +1214,7 @@ export default function EnvSetupView({
     persistDraft(envPairs);
 
     if (activeTab === 'global') {
-      const res = await fetch('/api/global-env', {
+      const res = await fetch(`${BASE_URL}/api/global-env`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ globalVars: overrides, profileKey: activeGlobalProfile })
@@ -1228,7 +1250,7 @@ export default function EnvSetupView({
     }
 
     try {
-      const res = await fetch('/api/profiles', {
+      const res = await fetch(`${BASE_URL}/api/profiles`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -1253,10 +1275,28 @@ export default function EnvSetupView({
         setSaveStatus(`✔ Đã tạo profile "${key}" cho toàn bộ hệ thống!`);
         setTimeout(() => setSaveStatus(''), 3000);
       } else {
-        alert('Lỗi: ' + (data.error || 'Không thể tạo profile'));
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Lỗi tạo profile',
+          message: data?.error || 'Không thể tạo profile.',
+          isAlert: true,
+          danger: true,
+          type: 'danger',
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setConfirmDialog(null)
+        });
       }
     } catch (e) {
-      alert('Lỗi kết nối: ' + e.message);
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Lỗi kết nối',
+        message: e?.message || String(e),
+        isAlert: true,
+        danger: true,
+        type: 'danger',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
     }
 
     setShowNewProfileModal(false);
@@ -1269,7 +1309,7 @@ export default function EnvSetupView({
 
   const handleUpdateProfile = async (key, updateData) => {
     try {
-      const res = await fetch(`/api/profiles/${encodeURIComponent(key)}`, {
+      const res = await fetch(`${BASE_URL}/api/profiles/${encodeURIComponent(key)}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updateData)
@@ -1282,16 +1322,34 @@ export default function EnvSetupView({
         setSaveStatus(`✔ Cập nhật profile "${key}" thành công!`);
         setTimeout(() => setSaveStatus(''), 2500);
       } else {
-        alert('Lỗi: ' + (data.error || 'Không thể cập nhật profile'));
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Lỗi cập nhật profile',
+          message: data?.error || 'Không thể cập nhật profile.',
+          isAlert: true,
+          danger: true,
+          type: 'danger',
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setConfirmDialog(null)
+        });
       }
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Lỗi kết nối',
+        message: e?.message || String(e),
+        isAlert: true,
+        danger: true,
+        type: 'danger',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
     }
   };
 
   const handleSetActiveProfileGlobal = async (key) => {
     try {
-      const res = await fetch('/api/profiles/active', {
+      const res = await fetch(`${BASE_URL}/api/profiles/active`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ profileKey: key, applyToAllServices: true })
@@ -1306,36 +1364,86 @@ export default function EnvSetupView({
         setTimeout(() => setSaveStatus(''), 2500);
       }
     } catch (e) {
-      alert('Lỗi kích hoạt: ' + e.message);
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Lỗi kích hoạt profile',
+        message: e?.message || String(e),
+        isAlert: true,
+        danger: true,
+        type: 'danger',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
     }
   };
 
-  const handleDeleteProfileClick = async (profileKey) => {
+  const handleDeleteProfileClick = (profileKey) => {
     if (profileKey === 'default') {
-      alert('Không thể xóa profile default!');
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Không thể xóa',
+        message: 'Profile "default" là profile mặc định của hệ thống và không thể xóa.',
+        isAlert: true,
+        danger: false,
+        type: 'warning',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
       return;
     }
-    if (!confirm(`Bạn có chắc chắn muốn xóa profile "${profileKey}" cho toàn bộ hệ thống không?`)) return;
-    try {
-      const res = await fetch(`/api/profiles/${encodeURIComponent(profileKey)}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        if (data.activeGlobalProfile) setActiveGlobalProfile(data.activeGlobalProfile);
-        if (data.globalProfiles) setGlobalProfiles(data.globalProfiles);
-        const pairs = Object.entries(data.globalEnv || {}).map(([k, v]) => ({ key: k, value: String(v) }));
-        setGlobalEnvPairs(pairs);
-        if (activeTab === 'global') {
-          setEnvPairs(pairs);
-          setRawText(pairs.map(p => `${p.key}=${p.value}`).join('\n'));
+
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xác nhận xóa Profile',
+      message: `Bạn có chắc chắn muốn xóa profile "${profileKey}" cho toàn bộ hệ thống không?\nCác biến môi trường thuộc profile này sẽ bị loại bỏ. Thao tác không thể hoàn tác.`,
+      itemName: profileKey,
+      confirmText: 'Xóa Profile',
+      cancelText: 'Hủy',
+      danger: true,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch(`${BASE_URL}/api/profiles/${encodeURIComponent(profileKey)}`, { method: 'DELETE' });
+          const data = await res.json();
+          if (data.success) {
+            if (data.activeGlobalProfile) setActiveGlobalProfile(data.activeGlobalProfile);
+            if (data.globalProfiles) setGlobalProfiles(data.globalProfiles);
+            const pairs = Object.entries(data.globalEnv || {}).map(([k, v]) => ({ key: k, value: String(v) }));
+            setGlobalEnvPairs(pairs);
+            if (activeTab === 'global') {
+              setEnvPairs(pairs);
+              setRawText(pairs.map(p => `${p.key}=${p.value}`).join('\n'));
+            }
+            setSaveStatus(`✔ Đã xóa profile "${profileKey}" thành công!`);
+            setTimeout(() => setSaveStatus(''), 2500);
+          } else {
+            setConfirmDialog({
+              isOpen: true,
+              title: 'Lỗi xóa profile',
+              message: data?.error || 'Thất bại khi xóa profile.',
+              isAlert: true,
+              danger: true,
+              type: 'danger',
+              confirmText: 'Đã hiểu',
+              onConfirm: () => setConfirmDialog(null)
+            });
+          }
+        } catch (e) {
+          setConfirmDialog({
+            isOpen: true,
+            title: 'Lỗi kết nối',
+            message: e?.message || String(e),
+            isAlert: true,
+            danger: true,
+            type: 'danger',
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setConfirmDialog(null)
+          });
         }
-        setSaveStatus(`✔ Đã xóa profile "${profileKey}" thành công!`);
-        setTimeout(() => setSaveStatus(''), 2500);
-      } else {
-        alert('Lỗi xóa profile: ' + (data.error || 'Thất bại'));
-      }
-    } catch (e) {
-      alert('Lỗi: ' + e.message);
-    }
+      },
+      onCancel: () => setConfirmDialog(null)
+    });
   };
 
   const filteredPairs = useMemo(() => {
@@ -1615,27 +1723,18 @@ export default function EnvSetupView({
               </div>
 
               <button
-                onClick={() => setShowNewProfileModal(true)}
-                className="px-2.5 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center space-x-1 hover:text-white"
+                onClick={() => setActiveTab('profiles')}
+                title="Quản lý danh sách Profiles tập trung"
+                className="px-2.5 py-1.5 text-xs font-medium rounded-xl border transition-all flex items-center space-x-1.5 hover:opacity-100 opacity-80"
                 style={{
-                  backgroundColor: `${accentColor}18`,
-                  borderColor: `${accentColor}35`,
+                  backgroundColor: `${accentColor}10`,
+                  borderColor: `${accentColor}30`,
                   color: accentColor
                 }}
               >
-                <Plus size={13} />
-                <span>Thêm Profile</span>
+                <Sliders size={13} />
+                <span>Quản Lý Profiles</span>
               </button>
-
-              {activeProfileKey !== 'default' && (
-                <button
-                  onClick={() => handleDeleteProfileClick(activeProfileKey)}
-                  className="px-2.5 py-1.5 bg-rose-950/30 hover:bg-rose-600 text-rose-400 hover:text-white text-xs font-semibold rounded-xl border border-rose-800/40 transition-all flex items-center space-x-1"
-                >
-                  <Trash2 size={13} />
-                  <span>Xóa Profile</span>
-                </button>
-              )}
             </div>
           )}
 
@@ -1962,7 +2061,7 @@ export default function EnvSetupView({
         onClose={() => setIsBackupModalOpen(false)}
         onReloadAll={() => {
           if (activeTab === 'global') {
-            fetch('/api/global-env')
+            fetch(`${BASE_URL}/api/global-env`)
               .then(r => r.json())
               .then(d => {
                 if (d.success) setGlobalEnvPairs(Object.entries(d.globalEnv || {}).map(([k, v]) => ({ key: k, value: String(v) })));
@@ -2128,6 +2227,14 @@ export default function EnvSetupView({
             </div>
           </div>
         </div>
+      )}
+
+      {/* CONFIRM / ALERT POPUP */}
+      {confirmDialog?.isOpen && (
+        <ConfirmModal
+          {...confirmDialog}
+          settings={settings}
+        />
       )}
     </div>
   );

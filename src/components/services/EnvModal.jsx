@@ -3,8 +3,6 @@ import { X, Save, Plus, Trash2, CheckCircle, Sliders } from 'lucide-react';
 import { THEME_CONFIGS } from '../../constants/palettes';
 
 export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, settings = {} }) {
-  if (!isOpen || !service) return null;
-
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
   const accentColor = settings?.accentColor || '#10b981';
 
@@ -14,14 +12,14 @@ export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, se
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   useEffect(() => {
-    if (service && service.computedEnv) {
+    if (isOpen && service && service.computedEnv) {
       const pairs = Object.entries(service.computedEnv).map(([key, value]) => ({
         key,
         value: String(value)
       }));
       setEnvPairs(pairs);
     }
-  }, [service]);
+  }, [isOpen, service]);
 
   const handleValueChange = (index, val) => {
     const updated = [...envPairs];
@@ -42,6 +40,7 @@ export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, se
   };
 
   const handleSave = async () => {
+    if (!service?.id) return;
     const overrides = {};
     for (const item of envPairs) {
       overrides[item.key] = item.value;
@@ -66,6 +65,8 @@ export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, se
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
+
+  if (!isOpen || !service) return null;
 
   return (
     <div 

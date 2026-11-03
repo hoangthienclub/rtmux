@@ -4,7 +4,6 @@ import {
   Terminal, 
   Server, 
   FolderSync, 
-  LayoutDashboard, 
   Cpu, 
   ArrowLeftRight, 
   ShieldCheck, 
@@ -67,13 +66,6 @@ export default function CommandPaletteModal({
       icon: Terminal,
       shortcut: 'Ctrl+T',
       action: onOpenLocalShell
-    },
-    {
-      id: 'nav_dashboard',
-      title: 'Dashboard',
-      desc: 'Trang tổng quan trạng thái máy chủ & giám sát',
-      icon: LayoutDashboard,
-      action: () => onNavigate?.('dashboard')
     },
     {
       id: 'nav_machines',

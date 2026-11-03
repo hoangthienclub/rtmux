@@ -16,9 +16,34 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { THEME_CONFIGS } from '../../constants/palettes';
+import { BASE_URL } from '../../services/microserviceClient';
+import ConfirmModal from '../common/ConfirmModal';
 
 // ================= CATEGORY MODAL =================
 function CategoryModal({ category, isOpen, onClose, onSave, currentThemeConfig = {}, accentColor = '#10b981' }) {
+  const [id, setId] = useState('');
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#38bdf8');
+  const [description, setDescription] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg('');
+      if (category) {
+        setId(category.id || '');
+        setName(category.name || '');
+        setColor(category.color || '#38bdf8');
+        setDescription(category.description || '');
+      } else {
+        setId('');
+        setName('');
+        setColor('#38bdf8');
+        setDescription('');
+      }
+    }
+  }, [isOpen, category]);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -35,11 +60,6 @@ function CategoryModal({ category, isOpen, onClose, onSave, currentThemeConfig =
   if (!isOpen) return null;
   const isEdit = !!category;
 
-  const [id, setId] = useState(category?.id || '');
-  const [name, setName] = useState(category?.name || '');
-  const [color, setColor] = useState(category?.color || '#38bdf8');
-  const [description, setDescription] = useState(category?.description || '');
-
   const PALETTE = [
     '#38bdf8', '#818cf8', '#a855f7', '#ec4899', '#f43f5e',
     '#f97316', '#eab308', '#22c55e', '#14b8a6', '#64748b'
@@ -48,15 +68,16 @@ function CategoryModal({ category, isOpen, onClose, onSave, currentThemeConfig =
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!id.trim() || !name.trim()) {
-      alert('Vui lòng nhập đầy đủ Mã và Tên danh mục!');
+      setErrorMsg('Vui lòng nhập đầy đủ Mã và Tên danh mục!');
       return;
     }
+    setErrorMsg('');
     onSave({
       id: id.trim().toUpperCase().replace(/\s+/g, '_'),
       name: name.trim(),
       color,
       description: description.trim()
-    });
+    }, isEdit);
   };
 
   return (
@@ -161,6 +182,12 @@ function CategoryModal({ category, isOpen, onClose, onSave, currentThemeConfig =
             />
           </div>
 
+          {errorMsg && (
+            <p className="text-xs font-mono text-rose-400 p-2 rounded-lg bg-rose-950/30 border border-rose-800/40">
+              {errorMsg}
+            </p>
+          )}
+
           <div 
             className="flex justify-end gap-2 pt-2 border-t"
             style={{ borderColor: currentThemeConfig.border || '#27272a' }}
@@ -192,15 +219,46 @@ function CategoryModal({ category, isOpen, onClose, onSave, currentThemeConfig =
 
 // ================= ASSIGN SERVICES MODAL =================
 function AssignServicesModal({ category, services = [], isOpen, onClose, onSave, currentThemeConfig = {}, accentColor = '#10b981' }) {
-  if (!isOpen || !category) return null;
-  const catId = (category.id || '').toUpperCase();
-  const currentServiceIds = services
-    .filter(s => (s.group || s.category || '').toUpperCase() === catId)
-    .map(s => s.id);
-
-  const [selectedIds, setSelectedIds] = useState(currentServiceIds);
+  const [selectedIds, setSelectedIds] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const getSvcGroups = (s) => {
+    if (Array.isArray(s.groups) && s.groups.length > 0) {
+      return s.groups.map(g => String(g).trim().toUpperCase()).filter(Boolean);
+    }
+    const raw = s.group || s.category || 'SERVICE';
+    return String(raw).split(',').map(g => g.trim().toUpperCase()).filter(Boolean);
+  };
+
+  useEffect(() => {
+    if (isOpen && category) {
+      const catId = (category.id || '').toUpperCase();
+      const currentServiceIds = services
+        .filter(s => getSvcGroups(s).includes(catId))
+        .map(s => s.id);
+      setSelectedIds(currentServiceIds);
+      setSearchQuery('');
+      setSaving(false);
+    }
+  }, [isOpen, category, services]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose?.();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !category) return null;
+  const targetCatId = (category.id || '').toUpperCase();
 
   const filtered = services.filter(s => {
     if (!searchQuery.trim()) return true;
@@ -210,11 +268,12 @@ function AssignServicesModal({ category, services = [], isOpen, onClose, onSave,
 
   const handleSave = async () => {
     setSaving(true);
+    setErrorMsg('');
     try {
       await onSave(category.id, selectedIds);
       onClose();
     } catch (err) {
-      alert('Lỗi: ' + err.message);
+      setErrorMsg('Lỗi: ' + (err?.message || String(err)));
     } finally {
       setSaving(false);
     }
@@ -303,8 +362,8 @@ function AssignServicesModal({ category, services = [], isOpen, onClose, onSave,
             ) : (
               filtered.map(s => {
                 const isChecked = selectedIds.includes(s.id);
-                const currentGroup = (s.group || s.category || 'SERVICE').toUpperCase();
-                const isCurrentCat = currentGroup === catId;
+                const sGroups = getSvcGroups(s);
+                const isCurrentCat = sGroups.includes(targetCatId);
 
                 return (
                   <label
@@ -346,11 +405,13 @@ function AssignServicesModal({ category, services = [], isOpen, onClose, onSave,
                       </div>
                     </div>
 
-                    <div className="text-[10px] font-mono">
+                    <div className="text-[10px] font-mono flex items-center gap-1.5">
                       {isCurrentCat ? (
                         <span className="text-emerald-400 font-semibold">Đang ở nhóm này</span>
                       ) : (
-                        <span style={{ color: currentThemeConfig.textMuted || '#a1a1aa' }}>Nhóm hiện tại: {currentGroup}</span>
+                        <span style={{ color: currentThemeConfig.textMuted || '#a1a1aa' }}>
+                          Nhóm hiện tại: {sGroups.join(', ') || 'SERVICE'}
+                        </span>
                       )}
                     </div>
                   </label>
@@ -359,6 +420,12 @@ function AssignServicesModal({ category, services = [], isOpen, onClose, onSave,
             )}
           </div>
         </div>
+
+        {errorMsg && (
+          <div className="px-6 py-2 bg-rose-950/40 border-t border-rose-800/40 text-xs font-mono text-rose-300">
+            {errorMsg}
+          </div>
+        )}
 
         <div 
           className="flex justify-end gap-3 px-6 py-3.5 border-t"
@@ -406,11 +473,20 @@ export default function CategoriesView({ services = [], onReloadServices, settin
   const [searchQuery, setSearchQuery] = useState('');
   const [actionStatus, setActionStatus] = useState('');
   const [viewType, setViewType] = useState('list'); // 'list' | 'grid'
+  const [confirmDialog, setConfirmDialog] = useState(null);
+
+  const getSvcGroups = (s) => {
+    if (Array.isArray(s.groups) && s.groups.length > 0) {
+      return s.groups.map(g => String(g).trim().toUpperCase()).filter(Boolean);
+    }
+    const raw = s.group || s.category || 'SERVICE';
+    return String(raw).split(',').map(g => g.trim().toUpperCase()).filter(Boolean);
+  };
 
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch(`${BASE_URL}/api/categories`);
       const data = await res.json();
       if (data.success && Array.isArray(data.categories)) {
         setCategories(data.categories);
@@ -426,53 +502,106 @@ export default function CategoriesView({ services = [], onReloadServices, settin
     fetchCategories();
   }, []);
 
-  const handleSaveCategory = async (catData) => {
+  const handleSaveCategory = async (catData, isEdit) => {
     try {
-      const res = await fetch('/api/categories', {
-        method: 'POST',
+      const method = isEdit ? 'PUT' : 'POST';
+      const url = isEdit 
+        ? `${BASE_URL}/api/categories/${encodeURIComponent(catData.id)}`
+        : `${BASE_URL}/api/categories`;
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(catData)
       });
       const data = await res.json();
       if (data.success) {
-        setActionStatus(`✔ Đã lưu danh mục "${catData.name}" thành công!`);
+        setActionStatus(`✔ Đã ${isEdit ? 'cập nhật' : 'lưu'} danh mục "${catData.name}" thành công!`);
         setModalCategory(undefined);
         await fetchCategories();
         if (onReloadServices) onReloadServices();
       } else {
-        alert('Lỗi: ' + data.error);
+        setConfirmDialog({
+          isOpen: true,
+          title: isEdit ? 'Lỗi cập nhật danh mục' : 'Lỗi tạo danh mục',
+          message: data?.error || 'Không thể lưu danh mục.',
+          isAlert: true,
+          danger: true,
+          type: 'danger',
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setConfirmDialog(null)
+        });
       }
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Lỗi kết nối',
+        message: e?.message || String(e),
+        isAlert: true,
+        danger: true,
+        type: 'danger',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
     }
     setTimeout(() => setActionStatus(''), 3000);
   };
 
-  const handleDeleteCategory = async (catId, catName) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa danh mục "${catName || catId}" không?\n(Các service thuộc danh mục này sẽ được chuyển về nhóm "SERVICE")`)) return;
-    try {
-      const res = await fetch(`/api/categories/${encodeURIComponent(catId)}`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fallbackCategory: 'SERVICE' })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setActionStatus(`✔ Đã xóa danh mục "${catName || catId}" thành công!`);
-        await fetchCategories();
-        if (onReloadServices) onReloadServices();
-      } else {
-        alert('Lỗi: ' + data.error);
-      }
-    } catch (e) {
-      alert('Lỗi: ' + e.message);
-    }
-    setTimeout(() => setActionStatus(''), 3000);
+  const handleDeleteCategory = (catId, catName) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xác nhận xóa danh mục',
+      message: 'Bạn có chắc chắn muốn xóa danh mục này không?\nCác microservice thuộc danh mục này sẽ được tự động chuyển về nhóm mặc định "SERVICE". Thao tác này không thể hoàn tác.',
+      itemName: `${catName || catId} (${catId})`,
+      confirmText: 'Xóa danh mục',
+      cancelText: 'Hủy',
+      danger: true,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch(`${BASE_URL}/api/categories/${encodeURIComponent(catId)}`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ fallbackCategory: 'SERVICE' })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setActionStatus(`✔ Đã xóa danh mục "${catName || catId}" thành công!`);
+            await fetchCategories();
+            if (onReloadServices) onReloadServices();
+          } else {
+            setConfirmDialog({
+              isOpen: true,
+              title: 'Lỗi xóa danh mục',
+              message: data?.error || 'Không thể xóa danh mục này.',
+              isAlert: true,
+              danger: true,
+              type: 'danger',
+              confirmText: 'Đã hiểu',
+              onConfirm: () => setConfirmDialog(null)
+            });
+          }
+        } catch (e) {
+          setConfirmDialog({
+            isOpen: true,
+            title: 'Lỗi kết nối',
+            message: e?.message || String(e),
+            isAlert: true,
+            danger: true,
+            type: 'danger',
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setConfirmDialog(null)
+          });
+        }
+        setTimeout(() => setActionStatus(''), 3000);
+      },
+      onCancel: () => setConfirmDialog(null)
+    });
   };
 
   const handleAssignServices = async (catId, serviceIds) => {
     try {
-      const res = await fetch(`/api/categories/${encodeURIComponent(catId)}/services`, {
+      const res = await fetch(`${BASE_URL}/api/categories/${encodeURIComponent(catId)}/services`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ serviceIds })
@@ -481,12 +610,30 @@ export default function CategoriesView({ services = [], onReloadServices, settin
       if (data.success) {
         setActionStatus(`✔ Đã cập nhật gán services vào danh mục!`);
         await fetchCategories();
-        if (onReloadServices) onReloadServices();
+        if (onReloadServices) await onReloadServices();
       } else {
-        alert('Lỗi: ' + data.error);
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Lỗi gán services',
+          message: data?.error || 'Không thể gán services vào danh mục.',
+          isAlert: true,
+          danger: true,
+          type: 'danger',
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setConfirmDialog(null)
+        });
       }
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Lỗi kết nối',
+        message: e?.message || String(e),
+        isAlert: true,
+        danger: true,
+        type: 'danger',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
     }
     setTimeout(() => setActionStatus(''), 3000);
   };
@@ -623,7 +770,7 @@ export default function CategoriesView({ services = [], onReloadServices, settin
         <div className="space-y-3">
           {filteredCategories.map(cat => {
             const catId = (cat.id || '').toUpperCase();
-            const assignedServices = services.filter(s => (s.group || s.category || '').toUpperCase() === catId);
+            const assignedServices = services.filter(s => getSvcGroups(s).includes(catId));
 
             return (
               <div
@@ -716,7 +863,7 @@ export default function CategoriesView({ services = [], onReloadServices, settin
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredCategories.map(cat => {
             const catId = (cat.id || '').toUpperCase();
-            const assignedServices = services.filter(s => (s.group || s.category || '').toUpperCase() === catId);
+            const assignedServices = services.filter(s => getSvcGroups(s).includes(catId));
 
             return (
               <div
@@ -774,24 +921,36 @@ export default function CategoriesView({ services = [], onReloadServices, settin
       )}
 
       {/* MODALS */}
-      <CategoryModal
-        category={modalCategory}
-        isOpen={modalCategory !== undefined}
-        onClose={() => setModalCategory(undefined)}
-        onSave={handleSaveCategory}
-        currentThemeConfig={currentThemeConfig}
-        accentColor={accentColor}
-      />
+      {modalCategory !== undefined && (
+        <CategoryModal
+          category={modalCategory}
+          isOpen={modalCategory !== undefined}
+          onClose={() => setModalCategory(undefined)}
+          onSave={handleSaveCategory}
+          currentThemeConfig={currentThemeConfig}
+          accentColor={accentColor}
+        />
+      )}
 
-      <AssignServicesModal
-        category={assignModalCategory}
-        services={services}
-        isOpen={!!assignModalCategory}
-        onClose={() => setAssignModalCategory(null)}
-        onSave={handleAssignServices}
-        currentThemeConfig={currentThemeConfig}
-        accentColor={accentColor}
-      />
+      {Boolean(assignModalCategory) && (
+        <AssignServicesModal
+          category={assignModalCategory}
+          services={services}
+          isOpen={!!assignModalCategory}
+          onClose={() => setAssignModalCategory(null)}
+          onSave={handleAssignServices}
+          currentThemeConfig={currentThemeConfig}
+          accentColor={accentColor}
+        />
+      )}
+
+      {/* CONFIRM / ALERT POPUP */}
+      {confirmDialog?.isOpen && (
+        <ConfirmModal
+          {...confirmDialog}
+          settings={settings}
+        />
+      )}
     </div>
   );
 }

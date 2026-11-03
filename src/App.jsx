@@ -8,7 +8,6 @@ import GroupSection from './components/services/GroupSection';
 import QuickTasksBar from './components/services/QuickTasksBar';
 import EnvModal from './components/services/EnvModal';
 import SettingsModal from './components/SettingsModal';
-import DashboardView from './components/ssh/DashboardView';
 import KeychainView from './components/ssh/KeychainView';
 import IdentityView from './components/ssh/IdentityView';
 import ProxyView from './components/ssh/ProxyView';
@@ -43,7 +42,8 @@ import {
   stopAllServices, 
   restartAllServices, 
   runTask, 
-  subscribeMicroserviceEvents 
+  subscribeMicroserviceEvents,
+  BASE_URL 
 } from './services/microserviceClient';
 import { THEME_CONFIGS, SYSTEM_FONTS, UI_FONT_SIZES, getMetricColor } from './constants/palettes';
 import DataTable, { TableActionButton } from './components/common/DataTable';
@@ -205,9 +205,8 @@ const INITIAL_SERVICES = [
       prod: { name: 'Production' },
     },
     statusInfo: {
-      status: 'RUNNING',
+      status: 'STOPPED',
       port: 45072,
-      pid: 62410,
     },
     computedEnv: {
       PORT: '45072',
@@ -226,9 +225,8 @@ const INITIAL_SERVICES = [
       dev: { name: 'Develop' },
     },
     statusInfo: {
-      status: 'RUNNING',
+      status: 'STOPPED',
       port: 9098,
-      pid: 62452,
     },
     computedEnv: {
       PORT: '9098',
@@ -263,9 +261,8 @@ const INITIAL_SERVICES = [
       dev: { name: 'Develop' },
     },
     statusInfo: {
-      status: 'RUNNING',
+      status: 'STOPPED',
       port: 45071,
-      pid: 62489,
     },
     computedEnv: {
       PORT: '45071',
@@ -661,6 +658,7 @@ export default function App() {
   const [editingMachine, setEditingMachine] = useState(null);
   const [preselectedHost, setPreselectedHost] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [batchActionLoading, setBatchActionLoading] = useState(null);
   const [currentRunningTask, setCurrentRunningTask] = useState(null);
   const [lastTaskLog, setLastTaskLog] = useState('');
   const [envModalService, setEnvModalService] = useState(null);
@@ -912,6 +910,21 @@ export default function App() {
           setServices((prev) =>
             prev.map((s) => (s.id === updatedSvc.id ? { ...s, ...updatedSvc, statusInfo: s.statusInfo || updatedSvc.statusInfo } : s))
           );
+        },
+        onServicesUpdated: (updatedList) => {
+          if (!isMounted || !Array.isArray(updatedList)) return;
+          setServices((prev) => {
+            const statusMap = {};
+            prev.forEach((s) => { statusMap[s.id] = s.statusInfo; });
+            return updatedList.map((s) => ({
+              ...s,
+              statusInfo: s.statusInfo || statusMap[s.id] || { status: 'STOPPED' }
+            }));
+          });
+        },
+        onServiceDeleted: (data) => {
+          if (!isMounted || !data?.serviceId) return;
+          setServices((prev) => prev.filter((s) => s.id !== data.serviceId));
         }
       });
     }
@@ -929,21 +942,39 @@ export default function App() {
     setServices((prev) =>
       prev.map((s) => (s.id === id ? { ...s, statusInfo: { ...s.statusInfo, status: 'STARTING' } } : s))
     );
-    await startService(id);
+    try {
+      await startService(id);
+    } catch (e) {
+      console.error(`Failed to start service ${id}:`, e);
+    } finally {
+      await reloadMicroservices();
+    }
   };
 
   const handleStopService = async (id) => {
     setServices((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, statusInfo: { ...s.statusInfo, status: 'STOPPED', pid: null } } : s))
+      prev.map((s) => (s.id === id ? { ...s, statusInfo: { ...s.statusInfo, status: 'STOPPING' } } : s))
     );
-    await stopService(id);
+    try {
+      await stopService(id);
+    } catch (e) {
+      console.error(`Failed to stop service ${id}:`, e);
+    } finally {
+      await reloadMicroservices();
+    }
   };
 
   const handleRestartService = async (id) => {
     setServices((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, statusInfo: { ...s.statusInfo, status: 'STARTING' } } : s))
+      prev.map((s) => (s.id === id ? { ...s, statusInfo: { ...s.statusInfo, status: 'RESTARTING' } } : s))
     );
-    await restartService(id);
+    try {
+      await restartService(id);
+    } catch (e) {
+      console.error(`Failed to restart service ${id}:`, e);
+    } finally {
+      await reloadMicroservices();
+    }
   };
 
   const handleClearLogs = async (id) => {
@@ -966,31 +997,127 @@ export default function App() {
     await stopGroup(groupName);
   };
 
+  const reloadMicroservices = useCallback(async () => {
+    try {
+      const real = await fetchServices();
+      if (Array.isArray(real)) {
+        setServices(real);
+      }
+    } catch (e) {
+      console.warn('reloadMicroservices failed:', e);
+    }
+  }, []);
+
   const handleStartAll = async () => {
-    await startAllServices();
+    try {
+      setBatchActionLoading('start');
+      // Optimistically show STARTING on stopped services
+      setServices((prev) =>
+        prev.map((s) =>
+          (s.statusInfo?.status || '').toUpperCase() === 'RUNNING'
+            ? s
+            : { ...s, statusInfo: { ...s.statusInfo, status: 'STARTING' } }
+        )
+      );
+      await ensureBackendRunning({
+        enableWsl: settings.enableWsl,
+        wslDistro: settings.wslDistro,
+      });
+      await startAllServices();
+      await reloadMicroservices();
+    } catch (e) {
+      console.error('Failed to start all services:', e);
+      await reloadMicroservices();
+    } finally {
+      setBatchActionLoading(null);
+    }
   };
 
   const handleStopAll = async () => {
-    await stopAllServices();
+    try {
+      setBatchActionLoading('stop');
+      // Optimistically show STOPPING
+      setServices((prev) =>
+        prev.map((s) => ({
+          ...s,
+          statusInfo: { ...s.statusInfo, status: 'STOPPING' }
+        }))
+      );
+      await ensureBackendRunning({
+        enableWsl: settings.enableWsl,
+        wslDistro: settings.wslDistro,
+      });
+      await stopAllServices();
+      await reloadMicroservices();
+    } catch (e) {
+      console.error('Failed to stop all services:', e);
+      await reloadMicroservices();
+    } finally {
+      setBatchActionLoading(null);
+    }
   };
 
   const handleRestartAll = async () => {
-    await restartAllServices();
+    try {
+      setBatchActionLoading('restart');
+      setServices((prev) =>
+        prev.map((s) => ({
+          ...s,
+          statusInfo: { ...s.statusInfo, status: 'RESTARTING' }
+        }))
+      );
+      await ensureBackendRunning({
+        enableWsl: settings.enableWsl,
+        wslDistro: settings.wslDistro,
+      });
+      await restartAllServices();
+      await reloadMicroservices();
+    } catch (e) {
+      console.error('Failed to restart all services:', e);
+      await reloadMicroservices();
+    } finally {
+      setBatchActionLoading(null);
+    }
   };
 
   const handleKillPort = async (serviceIdOrPort) => {
-    if (typeof serviceIdOrPort === 'string') {
-      await killServicePort(serviceIdOrPort);
-    } else {
-      const target = services.find(s => s.port === serviceIdOrPort);
-      if (target) {
-        await killServicePort(target.id);
+    try {
+      if (typeof serviceIdOrPort === 'string') {
+        await killServicePort(serviceIdOrPort);
+      } else {
+        const target = services.find(s => s.port === serviceIdOrPort);
+        if (target) {
+          await killServicePort(target.id);
+        }
       }
+    } catch (e) {
+      console.error('Failed to kill service port:', e);
+    } finally {
+      await reloadMicroservices();
     }
   };
 
   const handleKillAll = async () => {
-    await killAllPorts();
+    try {
+      setBatchActionLoading('kill');
+      setServices((prev) =>
+        prev.map((s) => ({
+          ...s,
+          statusInfo: { ...s.statusInfo, status: 'STOPPED', pid: null }
+        }))
+      );
+      await ensureBackendRunning({
+        enableWsl: settings.enableWsl,
+        wslDistro: settings.wslDistro,
+      });
+      await killAllPorts();
+      await reloadMicroservices();
+    } catch (e) {
+      console.error('Failed to kill all ports:', e);
+      await reloadMicroservices();
+    } finally {
+      setBatchActionLoading(null);
+    }
   };
 
   const handleRunTask = async (taskId) => {
@@ -998,13 +1125,6 @@ export default function App() {
     setLastTaskLog(`Bắt đầu chạy tác vụ: ${taskId}...`);
     await runTask(taskId);
   };
-
-  const reloadMicroservices = useCallback(async () => {
-    const real = await fetchServices();
-    if (Array.isArray(real) && real.length > 0) {
-      setServices(real);
-    }
-  }, []);
 
   const handleSaveEnvOverrides = async (serviceId, overrides, profileKey) => {
     // Optimistically update React state immediately so navigating away never loses changes
@@ -1221,6 +1341,7 @@ export default function App() {
         onStopAll={handleStopAll}
         onRestartAll={handleRestartAll}
         onKillAll={handleKillAll}
+        batchActionLoading={batchActionLoading}
         onRefresh={() => {
           setIsRefreshing(true);
           setTimeout(() => setIsRefreshing(false), 500);
@@ -1328,12 +1449,6 @@ export default function App() {
               onBack={() => setCurrentNav('services')}
               initialCategory={settingsInitialCategory}
               isWindows={isWindows}
-            />
-          ) : currentNav === 'dashboard' ? (
-            <DashboardView 
-              machines={machines} 
-              onConnectHost={(mach) => handleConnectMachine(mach)} 
-              settings={settings}
             />
           ) : currentNav === 'hosts' ? (
             /* RTMUX REMOTE HOSTS & TMUX DASHBOARD */
@@ -1539,9 +1654,7 @@ export default function App() {
             />
           ) : currentNav === 'snippets' ? (
             <SnippetsView 
-              machines={machines}
               settings={settings}
-              onRunSnippet={(cmd, targetMach) => handleConnectMachine(targetMach || machines[0], cmd)} 
             />
           ) : currentNav === 'port_forward' ? (
             <PortForwardView 
@@ -1611,7 +1724,7 @@ export default function App() {
               onSaveOverrides={handleSaveEnvOverrides}
               onChangeProfile={handleChangeProfile}
               onCreateProfile={async (svcId, profileKey, profileData) => {
-                await fetch(`/api/services/${svcId}/profiles`, {
+                await fetch(`${BASE_URL}/api/services/${svcId}/profiles`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ profileKey, profileData })
@@ -1619,7 +1732,7 @@ export default function App() {
                 await reloadMicroservices();
               }}
               onDeleteProfile={async (svcId, profileKey) => {
-                await fetch(`/api/services/${svcId}/profiles/${profileKey}`, { method: 'DELETE' });
+                await fetch(`${BASE_URL}/api/services/${svcId}/profiles/${profileKey}`, { method: 'DELETE' });
                 await reloadMicroservices();
               }}
               onRestartService={handleRestartService}
@@ -1636,6 +1749,7 @@ export default function App() {
               services={services} 
               onReloadServices={reloadMicroservices}
               onAddNewService={(newSvc) => setServices(prev => [...prev, newSvc])} 
+              onUpdateService={(updatedSvc) => setServices(prev => prev.map(s => s.id === updatedSvc.id ? { ...s, ...updatedSvc } : s))}
               onDeleteService={(id) => setServices(prev => prev.filter(s => s.id !== id))} 
               settings={settings} 
             />
@@ -1665,6 +1779,10 @@ export default function App() {
               onStopGroup={handleStopGroup}
               onStartAll={handleStartAll}
               onStopAll={handleStopAll}
+              onRestartAll={handleRestartAll}
+              onKillAll={handleKillAll}
+              onReloadServices={reloadMicroservices}
+              batchActionLoading={batchActionLoading}
               settings={settings}
             />
           )}
@@ -1679,6 +1797,15 @@ export default function App() {
         onReloadAll={reloadMicroservices}
         currentThemeConfig={currentThemeConfig}
         accentColor={accentColor}
+        services={services}
+        machines={machines}
+        sshTunnels={sshTunnels}
+        settings={settings}
+        onRestoreClientData={(clientPayload) => {
+          if (clientPayload.machines) setMachines(clientPayload.machines);
+          if (clientPayload.sshTunnels) setSshTunnels(clientPayload.sshTunnels);
+          if (clientPayload.settings) setSettings(clientPayload.settings);
+        }}
       />
 
       {/* Env Modal */}

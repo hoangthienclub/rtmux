@@ -12,17 +12,23 @@ import {
   LayoutGrid,
   LayoutList,
   Layers,
-  Folder
+  Folder,
+  Filter,
+  Check,
+  X
 } from 'lucide-react';
 import GroupSection from './GroupSection';
 import { THEME_CONFIGS } from '../../constants/palettes';
+import { translations } from '../../i18n/translations';
 
 // Helper: Strip ANSI escape sequences and leftover artifacts like [38;5;3m or [0m
 function cleanAnsiText(text) {
   if (!text) return '';
   return text
-    .replace(/(?:\x1b|\u001b|\\x1b|\\u001b)\[[0-9;]*[a-zA-Z]/g, '')
-    .replace(/\[(?:38;5;\d+|[0-9;]{1,6})m/g, '');
+    .replace(/(?:\x1b|\u001b|\\x1b|\\u001b)\[[0-9;?]*[a-zA-Z]/g, '')
+    .replace(/(?:\x1b|\u001b|\\x1b|\\u001b)\([a-zA-Z]/g, '')
+    .replace(/\[(?:38;5;\d+|48;5;\d+|[0-9;]{1,12})m/g, '')
+    .replace(/\[(?:[0-9]{1,3})m/g, '');
 }
 
 // Helper: Classify log line level and return syntax color
@@ -51,6 +57,7 @@ function getLogLineStyle(text, type) {
   const isSuccess = lower.includes('successfully') || 
     lower.includes('listening at') || 
     lower.includes('running on') || 
+    lower.includes('running with') || 
     lower.includes('started on') ||
     lower.includes('connected') ||
     lower.includes('✔');
@@ -175,15 +182,48 @@ export default function ServiceMonitorView({
   onStopGroup,
   onStartAll,
   onStopAll,
+  onRestartAll,
+  onKillAll,
+  onReloadServices,
+  batchActionLoading = null,
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
   const accentColor = settings?.accentColor || '#10b981';
+  const lang = settings?.language || 'vi';
+  const t = translations?.[lang] || translations?.vi || {};
 
+  const [localActionLoading, setLocalActionLoading] = useState(null);
   const [filterKeyword, setFilterKeyword] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
-  const [selectedCategoryAction, setSelectedCategoryAction] = useState('ALL');
+  const [selectedCategoryFilters, setSelectedCategoryFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('service_tool_monitor_selected_categories');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (_) {}
+    return [];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('service_tool_monitor_selected_categories', JSON.stringify(selectedCategoryFilters));
+    } catch (_) {}
+  }, [selectedCategoryFilters]);
+
+  const [isCatDropdownOpen, setIsCatDropdownOpen] = useState(false);
   const logContainerRef = useRef(null);
+
+  // Helper: Extract all groups/categories for any service
+  const getSvcGroups = (s) => {
+    if (Array.isArray(s.groups) && s.groups.length > 0) {
+      return s.groups.map(g => String(g).trim().toUpperCase()).filter(Boolean);
+    }
+    const raw = s.group || s.category || 'SERVICE';
+    return String(raw).split(',').map(g => g.trim().toUpperCase()).filter(Boolean);
+  };
 
   // View mode: 'list' (2-column console view matching user mockup) or 'grid' (cards view)
   // Default is strictly 'list'
@@ -204,15 +244,38 @@ export default function ServiceMonitorView({
     } catch (_) {}
   };
 
-  // Group services by Category
+  // Distinct category list across all services
+  const allCategories = React.useMemo(() => {
+    const counts = {};
+    (Array.isArray(services) ? services : []).forEach(s => {
+      const groups = getSvcGroups(s);
+      groups.forEach(g => {
+        counts[g] = (counts[g] || 0) + 1;
+      });
+    });
+    return Object.keys(counts).map(catId => ({
+      id: catId,
+      name: catId,
+      count: counts[catId]
+    }));
+  }, [services]);
+
+  // Group services by Category (multi-category aware for Grid view)
   const groupedServices = {};
   (Array.isArray(services) ? services : []).forEach((s) => {
-    const cat = s.category || s.group || 'CORE';
-    if (!groupedServices[cat]) groupedServices[cat] = [];
-    groupedServices[cat].push(s);
+    const groups = getSvcGroups(s);
+    groups.forEach(cat => {
+      if (!groupedServices[cat]) groupedServices[cat] = [];
+      if (!groupedServices[cat].some(existing => existing.id === s.id)) {
+        groupedServices[cat].push(s);
+      }
+    });
   });
 
-  const categoryKeys = Object.keys(groupedServices);
+  const categoryKeys = Object.keys(groupedServices).filter(cat => {
+    if (selectedCategoryFilters.length === 0) return true;
+    return selectedCategoryFilters.includes(cat);
+  });
 
   // Active selected service
   const selectedService = (Array.isArray(services) && services.find(s => s.id === selectedServiceId)) || 
@@ -241,32 +304,116 @@ export default function ServiceMonitorView({
     }
   }, [rawLogs]);
 
-  // Filtered services for left sidebar
+  // Filtered services for left sidebar (multi-category + search)
   const filteredSidebarServices = (Array.isArray(services) ? services : []).filter(s => {
+    const sGroups = getSvcGroups(s);
+    if (selectedCategoryFilters.length > 0) {
+      const hasMatch = selectedCategoryFilters.some(cat => sGroups.includes(cat));
+      if (!hasMatch) return false;
+    }
     if (!serviceSearch.trim()) return true;
     const q = serviceSearch.toLowerCase();
     return (
       (s.name || '').toLowerCase().includes(q) ||
-      (s.category || '').toLowerCase().includes(q) ||
+      (s.id || '').toLowerCase().includes(q) ||
+      sGroups.some(g => g.toLowerCase().includes(q)) ||
       String(s.port || '').includes(q)
     );
   });
 
-  // Handle Start Category All
-  const handleStartSelectedCategory = () => {
-    if (selectedCategoryAction === 'ALL') {
-      if (onStartAll) onStartAll();
-    } else {
-      if (onStartGroup) onStartGroup(selectedCategoryAction);
+  // Running count within filtered sidebar services
+  const runningSidebarCount = filteredSidebarServices.filter(s => (s.statusInfo?.status || '').toUpperCase() === 'RUNNING').length;
+
+  const isStartLoading = batchActionLoading === 'start' || localActionLoading === 'start';
+  const isRestartLoading = batchActionLoading === 'restart' || localActionLoading === 'restart';
+  const isStopLoading = batchActionLoading === 'stop' || localActionLoading === 'stop';
+  const isKillLoading = batchActionLoading === 'kill' || localActionLoading === 'kill';
+  const isAnyLoading = isStartLoading || isRestartLoading || isStopLoading || isKillLoading;
+
+  // Scope label for category-targeted actions
+  const isAllCategories = selectedCategoryFilters.length === 0;
+  const scopeCount = filteredSidebarServices.length;
+  const scopeSuffix = isAllCategories ? 'All' : `(${scopeCount})`;
+
+  // Handle Start Selected Categories or All
+  const handleStartSelectedCategory = async () => {
+    if (isAnyLoading) return;
+    try {
+      setLocalActionLoading('start');
+      if (isAllCategories) {
+        if (onStartAll) await onStartAll();
+      } else {
+        const toStart = filteredSidebarServices.filter(s => (s.statusInfo?.status || '').toUpperCase() !== 'RUNNING');
+        await Promise.allSettled(
+          toStart.map(s => onStartService && onStartService(s.id))
+        );
+        if (onReloadServices) await onReloadServices();
+      }
+    } catch (err) {
+      console.error('Failed to start selected category services:', err);
+    } finally {
+      setLocalActionLoading(null);
     }
   };
 
-  // Handle Stop Category All
-  const handleStopSelectedCategory = () => {
-    if (selectedCategoryAction === 'ALL') {
-      if (onStopAll) onStopAll();
-    } else {
-      if (onStopGroup) onStopGroup(selectedCategoryAction);
+  // Handle Restart Selected Categories or All
+  const handleRestartSelectedCategory = async () => {
+    if (isAnyLoading) return;
+    try {
+      setLocalActionLoading('restart');
+      if (isAllCategories) {
+        if (onRestartAll) await onRestartAll();
+      } else {
+        await Promise.allSettled(
+          filteredSidebarServices.map(s => onRestartService && onRestartService(s.id))
+        );
+        if (onReloadServices) await onReloadServices();
+      }
+    } catch (err) {
+      console.error('Failed to restart selected category services:', err);
+    } finally {
+      setLocalActionLoading(null);
+    }
+  };
+
+  // Handle Stop Selected Categories or All
+  const handleStopSelectedCategory = async () => {
+    if (isAnyLoading) return;
+    try {
+      setLocalActionLoading('stop');
+      if (isAllCategories) {
+        if (onStopAll) await onStopAll();
+      } else {
+        const toStop = filteredSidebarServices.filter(s => (s.statusInfo?.status || '').toUpperCase() !== 'STOPPED');
+        await Promise.allSettled(
+          toStop.map(s => onStopService && onStopService(s.id))
+        );
+        if (onReloadServices) await onReloadServices();
+      }
+    } catch (err) {
+      console.error('Failed to stop selected category services:', err);
+    } finally {
+      setLocalActionLoading(null);
+    }
+  };
+
+  // Handle Kill Ports Selected Categories or All
+  const handleKillPortSelectedCategory = async () => {
+    if (isAnyLoading) return;
+    try {
+      setLocalActionLoading('kill');
+      if (isAllCategories) {
+        if (onKillAll) await onKillAll();
+      } else {
+        await Promise.allSettled(
+          filteredSidebarServices.map(s => onKillPort && onKillPort(s.id))
+        );
+        if (onReloadServices) await onReloadServices();
+      }
+    } catch (err) {
+      console.error('Failed to kill ports for selected category services:', err);
+    } finally {
+      setLocalActionLoading(null);
     }
   };
 
@@ -277,16 +424,18 @@ export default function ServiceMonitorView({
     >
       {/* 1. Header Card with Category Start All & Icon-only Toggle */}
       <div 
-        className="relative overflow-hidden rounded-2xl px-5 py-4 border transition-all flex-shrink-0 min-h-[72px]"
+        className="relative z-30 rounded-2xl px-5 py-4 border transition-all flex-shrink-0 min-h-[72px]"
         style={{ 
           backgroundColor: currentThemeConfig.card,
           borderColor: currentThemeConfig.border
         }}
       >
-        <div 
-          className="absolute right-0 top-0 w-72 h-full blur-3xl pointer-events-none"
-          style={{ backgroundColor: `${accentColor}12` }}
-        />
+        <div className="absolute inset-0 overflow-hidden rounded-2xl pointer-events-none">
+          <div 
+            className="absolute right-0 top-0 w-72 h-full blur-3xl pointer-events-none"
+            style={{ backgroundColor: `${accentColor}12` }}
+          />
+        </div>
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
           <div className="space-y-1">
             <h2 className="text-base font-bold tracking-tight flex items-center gap-2" style={{ color: currentThemeConfig.text }}>
@@ -299,7 +448,7 @@ export default function ServiceMonitorView({
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Category Start All / Stop All Segment */}
+            {/* Category Multiselect Start All / Stop All Segment */}
             <div 
               className="flex items-center gap-1.5 p-1 rounded-xl border flex-shrink-0 h-10 shadow-sm"
               style={{ 
@@ -309,44 +458,204 @@ export default function ServiceMonitorView({
             >
               {/* Category Dropdown Selector */}
               <div className="relative">
-                <select
-                  value={selectedCategoryAction}
-                  onChange={(e) => setSelectedCategoryAction(e.target.value)}
-                  className="appearance-none text-xs font-mono rounded-lg pl-2.5 pr-6 py-1.5 focus:outline-none cursor-pointer border-0 bg-transparent font-semibold"
-                  style={{ color: currentThemeConfig.text }}
-                  title="Chọn danh mục cần Start/Stop toàn bộ"
+                <button
+                  type="button"
+                  onClick={() => setIsCatDropdownOpen(prev => !prev)}
+                  className="h-8 px-2.5 rounded-lg text-xs font-mono font-semibold flex items-center gap-1.5 transition-all border cursor-pointer"
+                  style={{
+                    backgroundColor: selectedCategoryFilters.length > 0 ? `${accentColor}18` : 'transparent',
+                    borderColor: selectedCategoryFilters.length > 0 ? accentColor : 'transparent',
+                    color: selectedCategoryFilters.length > 0 ? accentColor : currentThemeConfig.text
+                  }}
+                  title="Chọn một hoặc nhiều danh mục để lọc và điều khiển"
                 >
-                  <option value="ALL" className="bg-slate-900 text-white">Tất cả danh mục ({categoryKeys.length})</option>
-                  {categoryKeys.map((cat) => (
-                    <option key={cat} value={cat} className="bg-slate-900 text-white">
-                      Danh mục: {cat} ({(groupedServices[cat] || []).length} apps)
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-1.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: currentThemeConfig.textMuted }} />
+                  <Filter size={12} style={{ color: selectedCategoryFilters.length > 0 ? accentColor : currentThemeConfig.textMuted }} />
+                  <span className="truncate max-w-[170px]">
+                    {selectedCategoryFilters.length === 0
+                      ? `Tất cả danh mục (${allCategories.length})`
+                      : selectedCategoryFilters.length === 1
+                      ? `Nhóm: ${selectedCategoryFilters[0]}`
+                      : `Nhóm (${selectedCategoryFilters.length} đã chọn)`}
+                  </span>
+                  <ChevronDown size={11} className={`transition-transform flex-shrink-0 ${isCatDropdownOpen ? 'rotate-180' : ''}`} style={{ color: currentThemeConfig.textMuted }} />
+                </button>
+
+                {/* Dropdown Menu */}
+                {isCatDropdownOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setIsCatDropdownOpen(false)} />
+                    <div 
+                      className="absolute right-0 top-full mt-2 w-72 rounded-2xl border shadow-2xl p-3 z-50 animate-in fade-in space-y-2"
+                      style={{
+                        backgroundColor: currentThemeConfig.card || '#18181b',
+                        borderColor: currentThemeConfig.border || '#27272a'
+                      }}
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b px-1" style={{ borderColor: currentThemeConfig.border }}>
+                        <span className="text-[11px] font-bold font-mono" style={{ color: currentThemeConfig.textMuted }}>
+                          Lọc danh mục ({selectedCategoryFilters.length}/{allCategories.length})
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCategoryFilters([])}
+                            className="text-[10px] font-mono hover:underline cursor-pointer"
+                            style={{ color: accentColor }}
+                          >
+                            Tất cả
+                          </button>
+                          <span style={{ color: currentThemeConfig.textMuted }}>•</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedCategoryFilters([])}
+                            className="text-[10px] font-mono text-rose-400 hover:underline cursor-pointer"
+                          >
+                            Xóa lọc
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="max-h-60 overflow-y-auto custom-scroll space-y-1">
+                        {allCategories.map(cat => {
+                          const isChecked = selectedCategoryFilters.includes(cat.id);
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedCategoryFilters(prev => {
+                                  if (prev.includes(cat.id)) {
+                                    return prev.filter(c => c !== cat.id);
+                                  } else {
+                                    return [...prev, cat.id];
+                                  }
+                                });
+                              }}
+                              className="w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-mono transition-colors text-left cursor-pointer border"
+                              style={{
+                                backgroundColor: isChecked ? `${accentColor}20` : 'transparent',
+                                borderColor: isChecked ? `${accentColor}50` : 'transparent',
+                                color: isChecked ? accentColor : currentThemeConfig.text
+                              }}
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] font-bold ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-slate-600 bg-black/20'}`}>
+                                  {isChecked && '✓'}
+                                </span>
+                                <span className="truncate font-semibold">{cat.name}</span>
+                              </div>
+                              <span 
+                                className="text-[10px] px-2 py-0.5 rounded-full font-mono font-semibold"
+                                style={{
+                                  backgroundColor: isChecked ? `${accentColor}30` : currentThemeConfig.innerInput,
+                                  color: isChecked ? accentColor : currentThemeConfig.textMuted
+                                }}
+                              >
+                                {cat.count} apps
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {selectedCategoryFilters.length > 0 && (
+                        <div className="pt-2 border-t flex items-center justify-between text-[11px] font-mono px-1" style={{ borderColor: currentThemeConfig.border }}>
+                          <span style={{ color: currentThemeConfig.textMuted }}>Khớp {filteredSidebarServices.length} services</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsCatDropdownOpen(false)}
+                            className="px-2.5 py-1 rounded-lg text-white font-bold text-xs"
+                            style={{ backgroundColor: accentColor }}
+                          >
+                            Xong
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Start Category Button */}
               <button
                 type="button"
                 onClick={handleStartSelectedCategory}
-                className="h-8 px-3 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm"
+                disabled={isAnyLoading}
+                className="h-8 px-2.5 rounded-lg text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 style={{ backgroundColor: accentColor }}
-                title={`Khởi động tất cả dịch vụ trong danh mục: ${selectedCategoryAction === 'ALL' ? 'Toàn bộ' : selectedCategoryAction}`}
+                title={`Khởi động ${isAllCategories ? 'tất cả dịch vụ' : `${scopeCount} dịch vụ trong danh mục đã chọn`}`}
               >
-                <Play size={11} className="fill-current" />
-                <span>Start {selectedCategoryAction === 'ALL' ? 'All' : selectedCategoryAction}</span>
+                {isStartLoading ? (
+                  <RotateCw size={11} className="animate-spin text-white" />
+                ) : (
+                  <Play size={11} className="fill-current" />
+                )}
+                <span>
+                  {isStartLoading
+                    ? 'Starting...'
+                    : `Start ${scopeSuffix}`}
+                </span>
+              </button>
+
+              {/* Restart Category Button */}
+              <button
+                type="button"
+                onClick={handleRestartSelectedCategory}
+                disabled={isAnyLoading}
+                className="h-8 px-2.5 rounded-lg border text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ 
+                  backgroundColor: currentThemeConfig.card || '#18181b',
+                  borderColor: currentThemeConfig.border || '#27272a',
+                  color: currentThemeConfig.text 
+                }}
+                title={`Khởi động lại ${isAllCategories ? 'tất cả dịch vụ' : `${scopeCount} dịch vụ trong danh mục đã chọn`}`}
+              >
+                <RotateCw size={11} className={isRestartLoading ? 'animate-spin text-emerald-400' : ''} />
+                <span>
+                  {isRestartLoading
+                    ? 'Restarting...'
+                    : `Restart ${scopeSuffix}`}
+                </span>
               </button>
 
               {/* Stop Category Button */}
               <button
                 type="button"
                 onClick={handleStopSelectedCategory}
-                className="h-8 px-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-sm"
-                title={`Dừng tất cả dịch vụ trong danh mục: ${selectedCategoryAction === 'ALL' ? 'Toàn bộ' : selectedCategoryAction}`}
+                disabled={isAnyLoading}
+                className="h-8 px-2.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+                title={`Dừng ${isAllCategories ? 'tất cả dịch vụ' : `${scopeCount} dịch vụ trong danh mục đã chọn`}`}
               >
-                <Square size={11} className="fill-current" />
-                <span className="hidden sm:inline">Stop</span>
+                {isStopLoading ? (
+                  <RotateCw size={11} className="animate-spin text-white" />
+                ) : (
+                  <Square size={11} className="fill-current" />
+                )}
+                <span>
+                  {isStopLoading
+                    ? 'Stopping...'
+                    : `Stop ${scopeSuffix}`}
+                </span>
+              </button>
+
+              {/* Kill Ports Category Button */}
+              <button
+                type="button"
+                onClick={handleKillPortSelectedCategory}
+                disabled={isAnyLoading}
+                className="h-8 px-2.5 rounded-lg text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                title={`Giải phóng cổng mạng (Kill Ports) của ${isAllCategories ? 'tất cả dịch vụ' : `${scopeCount} dịch vụ trong danh mục đã chọn`}`}
+              >
+                {isKillLoading ? (
+                  <RotateCw size={11} className="animate-spin text-amber-300" />
+                ) : (
+                  <Zap size={11} className="fill-current text-amber-400" />
+                )}
+                <span>
+                  {isKillLoading
+                    ? 'Killing...'
+                    : `Kill Ports ${scopeSuffix}`}
+                </span>
               </button>
             </div>
 
@@ -405,26 +714,36 @@ export default function ServiceMonitorView({
           >
             {/* Header row */}
             <div 
-              className="flex items-center justify-between pb-3 mb-3 border-b"
+              className="flex items-center justify-between pb-3 mb-2.5 border-b"
               style={{ borderColor: currentThemeConfig.border }}
             >
               <span className="font-bold text-xs tracking-wider uppercase font-sans" style={{ color: currentThemeConfig.text }}>
                 Danh Sách Services
               </span>
               <span 
-                className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full border"
+                className="font-mono text-xs font-semibold px-2 py-0.5 rounded-full border flex items-center gap-1.5"
                 style={{ 
-                  color: accentColor, 
-                  backgroundColor: `${accentColor}18`, 
-                  borderColor: `${accentColor}35` 
+                  color: runningSidebarCount > 0 ? accentColor : currentThemeConfig.textMuted, 
+                  backgroundColor: runningSidebarCount > 0 ? `${accentColor}18` : currentThemeConfig.innerInput, 
+                  borderColor: runningSidebarCount > 0 ? `${accentColor}35` : currentThemeConfig.border 
                 }}
+                title={filteredSidebarServices.length !== services.length 
+                  ? `Đang chạy ${runningSidebarCount}/${filteredSidebarServices.length} (Bộ lọc đang áp dụng trên tổng ${services.length} services)`
+                  : `Đang chạy ${runningSidebarCount}/${services.length} services`}
               >
-                {services.length} apps
+                <span 
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{
+                    backgroundColor: runningSidebarCount > 0 ? accentColor : '#64748b',
+                    boxShadow: runningSidebarCount > 0 ? `0 0 6px ${accentColor}` : 'none'
+                  }}
+                />
+                <span>{runningSidebarCount}/{filteredSidebarServices.length} {t.running || 'running'}</span>
               </span>
             </div>
 
             {/* Quick search input */}
-            <div className="relative mb-2.5">
+            <div className="relative mb-3">
               <input
                 type="text"
                 placeholder="Tìm service..."
@@ -447,6 +766,7 @@ export default function ServiceMonitorView({
                 const svcStatus = (svc.statusInfo?.status || 'STOPPED').toUpperCase();
                 const isSvcError = svcStatus === 'ERROR';
                 const isSvcRunning = svcStatus === 'RUNNING';
+                const svcGroups = getSvcGroups(svc);
 
                 return (
                   <button
@@ -493,6 +813,23 @@ export default function ServiceMonitorView({
                       <span className="text-[10.5px] font-mono" style={{ color: currentThemeConfig.textMuted }}>
                         {svc.activeProfile || 'default'}
                       </span>
+                    </div>
+
+                    {/* Category badges */}
+                    <div className="flex items-center gap-1 flex-wrap mt-1.5">
+                      {svcGroups.map(grp => (
+                        <span 
+                          key={grp} 
+                          className="text-[9px] font-mono px-1.5 py-0.2 rounded border"
+                          style={{
+                            backgroundColor: currentThemeConfig.card,
+                            borderColor: currentThemeConfig.border,
+                            color: currentThemeConfig.textMuted
+                          }}
+                        >
+                          {grp}
+                        </span>
+                      ))}
                     </div>
                   </button>
                 );
@@ -559,7 +896,8 @@ export default function ServiceMonitorView({
                 {isRunning ? (
                   <button
                     onClick={() => onStopService && onStopService(selectedService.id)}
-                    className="flex items-center gap-1.5 h-8 px-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                    className="flex items-center gap-1.5 h-8 px-3.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
+                    title={`Dừng dịch vụ ${selectedService.name}`}
                   >
                     <Square size={12} className="fill-current" />
                     <span>Stop</span>
@@ -567,8 +905,9 @@ export default function ServiceMonitorView({
                 ) : (
                   <button
                     onClick={() => onStartService && onStartService(selectedService.id)}
-                    className="flex items-center gap-1.5 h-8 px-4 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95"
+                    className="flex items-center gap-1.5 h-8 px-4 text-white rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
                     style={{ backgroundColor: accentColor }}
+                    title={`Khởi động dịch vụ ${selectedService.name}`}
                   >
                     <Play size={12} className="fill-current" />
                     <span>Start ({selectedService.activeProfile || 'default'})</span>
@@ -578,13 +917,13 @@ export default function ServiceMonitorView({
                 {/* Restart */}
                 <button
                   onClick={() => onRestartService && onRestartService(selectedService.id)}
-                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium border transition-all active:scale-95 hover:border-slate-500"
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium border transition-all active:scale-95 hover:border-slate-500 cursor-pointer"
                   style={{
                     backgroundColor: currentThemeConfig.innerInput,
                     borderColor: currentThemeConfig.border,
                     color: currentThemeConfig.text
                   }}
-                  title="Khởi động lại dịch vụ"
+                  title={`Khởi động lại dịch vụ ${selectedService.name}`}
                 >
                   <RotateCw size={12} />
                   <span>Restart</span>
@@ -592,9 +931,9 @@ export default function ServiceMonitorView({
 
                 {/* Kill Port */}
                 <button
-                  onClick={() => onKillPort && onKillPort(selectedService.id || selectedService.port)}
-                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium border transition-all active:scale-95 bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-                  title="Giải phóng cổng mạng"
+                  onClick={() => onKillPort && onKillPort(selectedService.id)}
+                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium border transition-all active:scale-95 bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25 cursor-pointer"
+                  title={`Giải phóng cổng mạng của ${selectedService.name} (Port ${selectedService.port})`}
                 >
                   <Zap size={12} />
                   <span>Kill Port</span>

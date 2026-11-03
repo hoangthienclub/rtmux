@@ -459,6 +459,21 @@ export default function TerminalView({
   const [processSearch, setProcessSearch] = useState('');
   const [realProcesses, setRealProcesses] = useState([]);
   const [hostProbeStatus, setHostProbeStatus] = useState(null);
+  const [telemetry, setTelemetry] = useState({
+    cpu: { usage: '12.4%', percentNum: 12.4, cores: 8, load: '' },
+    ram: { used: '3.2 GB', total: '8.0 GB', free: '4.8 GB', percentNum: 40, percentStr: '40%' },
+    disk: {
+      used: '...',
+      total: '...',
+      free: '...',
+      percentNum: 0,
+      percentStr: '0%',
+      mount: '/',
+      fs: '',
+      list: []
+    },
+    lastUpdated: null
+  });
 
   const isWsl = !!(settings?.enableWsl);
   const isLocalSession = Boolean(
@@ -481,18 +496,134 @@ export default function TerminalView({
     ? `ssh ${idFile ? `-i "${idFile}" ` : ''}-p ${activeSession.port || 22} ${activeSession.user || 'root'}@${activeSession.hostname || activeSession.name}`
     : null;
 
-  // Real Process Fetcher for Monitor
+  // Telemetry & Real Process Fetcher for Monitor
   const fetchRealProcesses = useCallback(async () => {
     if (!activeSession) return;
     try {
       const isLinuxShell = isRemote || activeSession?.os === 'wsl' || sessionUseWsl || activeSession?.os === 'linux' || activeSession?.os === 'macos';
       const cmd = isLinuxShell 
-        ? "ps -eo pid,pcpu,pmem,comm --sort=-%cpu | head -n 15"
-        : "Get-Process | Sort-Object CPU -Descending | Select-Object -First 10 Id, ProcessName, CPU, WorkingSet";
+        ? 'echo "===DISK==="; df -hP -x tmpfs -x devtmpfs -x overlay 2>/dev/null || df -hP /; echo "===RAM==="; free -m; echo "===CPU==="; cat /proc/loadavg 2>/dev/null; nproc 2>/dev/null; echo "===PS==="; ps -eo pid,pcpu,pmem,comm --sort=-%cpu | head -n 15'
+        : 'Write-Output "===DISK==="; Get-PSDrive -PSProvider FileSystem | ForEach-Object { "$($_.Name);;$([math]::Round($_.Used/1GB,1))GB;;$([math]::Round(($_.Used+$_.Free)/1GB,1))GB;;$([math]::Round($_.Free/1GB,1))GB;;$([math]::Round($_.Used*100/($_.Used+$_.Free),1))%" }; Write-Output "===RAM==="; Get-CimInstance Win32_OperatingSystem | ForEach-Object { "$([math]::Round(($_.TotalVisibleMemorySize-$_.FreePhysicalMemory)/1MB,1));;$([math]::Round($_.TotalVisibleMemorySize/1MB,1));;$([math]::Round($_.FreePhysicalMemory/1MB,1));;$([math]::Round(($_.TotalVisibleMemorySize-$_.FreePhysicalMemory)*100/$_.TotalVisibleMemorySize,1))%" }; Write-Output "===CPU==="; (Get-CimInstance Win32_Processor).LoadPercentage; Write-Output "===PS==="; Get-Process | Sort-Object CPU -Descending | Select-Object -First 15 Id, ProcessName, CPU, WorkingSet';
+
       const res = await execSshCommand(targetHost, cmd, isRemote ? isWsl : sessionUseWsl);
       if (res && res.stdout) {
-        const lines = res.stdout.trim().split(/\r?\n/).slice(1);
-        const parsed = lines.map(line => {
+        const stdout = res.stdout;
+        const sections = {};
+        let currentSec = null;
+        stdout.split(/\r?\n/).forEach(line => {
+          const m = line.match(/^===(DISK|RAM|CPU|PS)===/);
+          if (m) {
+            currentSec = m[1];
+            sections[currentSec] = [];
+          } else if (currentSec) {
+            sections[currentSec].push(line);
+          }
+        });
+
+        // 1. Parse Disk
+        const diskLines = (sections.DISK || []).filter(l => l.trim() && !l.includes('Filesystem') && !l.includes('Capacity') && !l.includes('Mounted on'));
+        const disks = [];
+        if (isLinuxShell) {
+          diskLines.forEach(l => {
+            const p = l.trim().split(/\s+/);
+            if (p.length >= 6) {
+              const pcentNum = parseInt(p[4].replace('%', ''), 10) || 0;
+              disks.push({
+                fs: p[0],
+                total: p[1],
+                used: p[2],
+                free: p[3],
+                percentStr: p[4],
+                percentNum: pcentNum,
+                mount: p[5]
+              });
+            }
+          });
+        } else {
+          diskLines.forEach(l => {
+            const p = l.split(';;');
+            if (p.length >= 5) {
+              const pcentNum = Math.round(parseFloat(p[4].replace('%', '')) || 0);
+              disks.push({
+                fs: p[0] + ':',
+                used: p[1],
+                total: p[2],
+                free: p[3],
+                percentStr: `${pcentNum}%`,
+                percentNum: pcentNum,
+                mount: p[0] + ':\\'
+              });
+            }
+          });
+        }
+
+        const primaryDisk = disks.find(d => d.mount === '/' || d.mount === 'C:\\') || disks[0] || null;
+
+        // 2. Parse RAM
+        let ramData = null;
+        if (isLinuxShell) {
+          const memLine = (sections.RAM || []).find(l => l.trim().startsWith('Mem:'));
+          if (memLine) {
+            const p = memLine.trim().split(/\s+/);
+            const totalMb = parseFloat(p[1]) || 1;
+            const usedMb = parseFloat(p[2]) || 0;
+            const freeMb = parseFloat(p[6] || p[3]) || 0;
+            const pcentNum = Math.min(100, Math.round((usedMb / totalMb) * 100));
+            ramData = {
+              total: (totalMb / 1024).toFixed(1) + ' GB',
+              used: (usedMb / 1024).toFixed(1) + ' GB',
+              free: (freeMb / 1024).toFixed(1) + ' GB',
+              percentNum: pcentNum,
+              percentStr: `${pcentNum}%`
+            };
+          }
+        } else {
+          const memLine = (sections.RAM || []).find(l => l.trim().length > 0 && l.includes(';;'));
+          if (memLine) {
+            const p = memLine.split(';;');
+            const pcentNum = Math.round(parseFloat(p[3]?.replace('%', '')) || 0);
+            ramData = {
+              used: `${p[0]} GB`,
+              total: `${p[1]} GB`,
+              free: `${p[2]} GB`,
+              percentNum: pcentNum,
+              percentStr: `${pcentNum}%`
+            };
+          }
+        }
+
+        // 3. Parse CPU
+        let cpuData = null;
+        if (isLinuxShell) {
+          const cpuLines = (sections.CPU || []).filter(l => l.trim());
+          if (cpuLines.length > 0) {
+            const p = cpuLines[0].trim().split(/\s+/);
+            const load1 = parseFloat(p[0]) || 0;
+            const cores = parseInt(cpuLines[1], 10) || 8;
+            const pcentNum = Math.min(100, Math.max(1, Math.round((load1 / cores) * 100)));
+            cpuData = {
+              usage: `${pcentNum}%`,
+              percentNum: pcentNum,
+              load: p.slice(0, 3).join(' '),
+              cores
+            };
+          }
+        } else {
+          const cpuLine = (sections.CPU || []).find(l => l.trim().length > 0);
+          if (cpuLine) {
+            const val = parseInt(cpuLine.trim(), 10) || 12;
+            cpuData = {
+              usage: `${val}%`,
+              percentNum: val,
+              load: `${val}%`,
+              cores: 8
+            };
+          }
+        }
+
+        // 4. Parse Processes
+        const psLines = (sections.PS || []).slice(1);
+        const parsed = psLines.map(line => {
           const parts = line.trim().split(/\s+/);
           return {
             pid: parts[0] || '-',
@@ -500,17 +631,38 @@ export default function TerminalView({
             mem: parts[2] ? `${parts[2]}%` : '-',
             cmd: parts.slice(3).join(' ') || parts[1] || 'proc'
           };
-        }).filter(p => p.pid !== '-');
+        }).filter(p => p.pid !== '-' && p.pid !== 'Id');
+
         if (parsed.length > 0) setRealProcesses(parsed);
+
+        setTelemetry(prev => ({
+          cpu: cpuData || prev.cpu,
+          ram: ramData || prev.ram,
+          disk: primaryDisk ? {
+            used: primaryDisk.used,
+            total: primaryDisk.total,
+            free: primaryDisk.free,
+            percentNum: primaryDisk.percentNum,
+            percentStr: primaryDisk.percentStr,
+            mount: primaryDisk.mount,
+            fs: primaryDisk.fs,
+            list: disks
+          } : prev.disk,
+          lastUpdated: new Date().toLocaleTimeString()
+        }));
       }
     } catch (e) {
-      console.warn('Failed to fetch real processes:', e);
+      console.warn('Failed to fetch telemetry and processes:', e);
     }
   }, [activeSession, isRemote, targetHost, sessionUseWsl]);
 
   useEffect(() => {
     if (isMonitorOpen && activeSession) {
       fetchRealProcesses();
+      const timer = setInterval(() => {
+        fetchRealProcesses();
+      }, 6000);
+      return () => clearInterval(timer);
     }
   }, [isMonitorOpen, activeSession, fetchRealProcesses]);
 
@@ -863,7 +1015,9 @@ export default function TerminalView({
                 </span>
               </div>
               <p className="text-[10px]" style={{ color: currentThemeConfig.textMuted }}>
-                {activeSession?.os === 'windows' ? 'windows (x86_64) (14 cores)' : 'ubuntu (x86_64) (8 cores)'}
+                {activeSession?.os === 'windows' 
+                  ? 'windows (x86_64) (14 cores)' 
+                  : (telemetry.cpu.cores ? `linux (x86_64) (${telemetry.cpu.cores} cores)` : 'ubuntu (x86_64) (8 cores)')}
               </p>
             </div>
 
@@ -881,15 +1035,21 @@ export default function TerminalView({
                   CPU Usage
                 </span>
                 <span className="font-mono text-[11px] font-semibold" style={{ color: accentColor }}>
-                  {(hostProbeStatus?.reachable || !isRemote) ? '12.4%' : 'Offline'}
+                  {(hostProbeStatus?.reachable || !isRemote) ? telemetry.cpu.usage : 'Offline'}
                 </span>
               </div>
               <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
                 <div 
                   className="h-full rounded-full transition-all duration-500" 
-                  style={{ width: (hostProbeStatus?.reachable || !isRemote) ? '12.4%' : '0%', backgroundColor: accentColor }}
+                  style={{ width: (hostProbeStatus?.reachable || !isRemote) ? `${telemetry.cpu.percentNum}%` : '0%', backgroundColor: accentColor }}
                 />
               </div>
+              {telemetry.cpu.load && (
+                <div className="flex items-center justify-between text-[10px] font-mono" style={{ color: currentThemeConfig.textMuted }}>
+                  <span>Load Avg:</span>
+                  <span>{telemetry.cpu.load}</span>
+                </div>
+              )}
             </div>
 
             {/* 2. Memory Card */}
@@ -902,16 +1062,89 @@ export default function TerminalView({
             >
               <div className="flex items-center justify-between">
                 <span className="font-bold flex items-center gap-1.5" style={{ color: currentThemeConfig.text }}>
-                  <HardDrive size={13} style={{ color: '#38bdf8' }} />
+                  <Database size={13} style={{ color: '#38bdf8' }} />
                   RAM Free / Total
                 </span>
                 <span className="font-mono text-[11px]" style={{ color: currentThemeConfig.textMuted }}>
-                  3.2 / 8.0 GB
+                  {telemetry.ram.free} / {telemetry.ram.total}
                 </span>
               </div>
               <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
-                <div className="bg-sky-500 h-full rounded-full" style={{ width: '40%' }} />
+                <div 
+                  className="bg-sky-500 h-full rounded-full transition-all duration-500" 
+                  style={{ width: `${telemetry.ram.percentNum}%` }} 
+                />
               </div>
+              <div className="flex items-center justify-between text-[10px] font-mono" style={{ color: currentThemeConfig.textMuted }}>
+                <span>Đã dùng: {telemetry.ram.used}</span>
+                <span className="text-sky-400 font-semibold">{telemetry.ram.percentStr}</span>
+              </div>
+            </div>
+
+            {/* 3. Disk Storage Card (Ổ Đĩa) */}
+            <div 
+              className="p-3 rounded-xl border space-y-2 text-xs"
+              style={{
+                backgroundColor: currentThemeConfig.card,
+                borderColor: currentThemeConfig.border
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-bold flex items-center gap-1.5" style={{ color: currentThemeConfig.text }}>
+                  <HardDrive size={13} style={{ color: '#f59e0b' }} />
+                  Disk Storage (Ổ Đĩa)
+                </span>
+                <span 
+                  className="font-mono text-[11px] font-bold" 
+                  style={{ 
+                    color: telemetry.disk.percentNum >= 90 ? '#ef4444' : (telemetry.disk.percentNum >= 75 ? '#f59e0b' : accentColor) 
+                  }}
+                >
+                  {telemetry.disk.used} / {telemetry.disk.total} ({telemetry.disk.percentStr})
+                </span>
+              </div>
+              <div className="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full transition-all duration-500" 
+                  style={{ 
+                    width: `${Math.min(100, telemetry.disk.percentNum)}%`, 
+                    backgroundColor: telemetry.disk.percentNum >= 90 ? '#ef4444' : (telemetry.disk.percentNum >= 75 ? '#f59e0b' : accentColor) 
+                  }} 
+                />
+              </div>
+              <div className="flex items-center justify-between text-[10px] font-mono" style={{ color: currentThemeConfig.textMuted }}>
+                <span className="truncate max-w-[130px]" title={telemetry.disk.fs}>
+                  Gắn tại: {telemetry.disk.mount}
+                </span>
+                <span className="font-semibold" style={{ color: telemetry.disk.percentNum >= 90 ? '#ef4444' : currentThemeConfig.textMuted }}>
+                  Trống: {telemetry.disk.free}
+                </span>
+              </div>
+
+              {/* Sub-partitions list if multiple disks exist (e.g. /data, /home) */}
+              {telemetry.disk.list && telemetry.disk.list.length > 1 && (
+                <div className="pt-2 border-t space-y-1.5 font-mono text-[10px]" style={{ borderColor: currentThemeConfig.border }}>
+                  <div className="text-[9.5px] uppercase tracking-wider font-semibold" style={{ color: currentThemeConfig.textMuted }}>
+                    Các phân vùng khác ({telemetry.disk.list.length}):
+                  </div>
+                  {telemetry.disk.list.map((d, idx) => (
+                    <div key={idx} className="flex items-center justify-between py-0.5 px-1 rounded bg-black/20">
+                      <span className="truncate max-w-[90px] font-bold" style={{ color: currentThemeConfig.text }}>
+                        {d.mount}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span style={{ color: currentThemeConfig.textMuted }}>{d.used}/{d.total}</span>
+                        <span 
+                          className="font-semibold"
+                          style={{ color: d.percentNum >= 90 ? '#ef4444' : (d.percentNum >= 75 ? '#f59e0b' : accentColor) }}
+                        >
+                          {d.percentStr}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* 3. Real Process List */}

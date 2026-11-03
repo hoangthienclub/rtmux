@@ -24,9 +24,40 @@ import {
   Activity
 } from 'lucide-react';
 import { THEME_CONFIGS } from '../../constants/palettes';
+import { BASE_URL } from '../../services/microserviceClient';
+import ConfirmModal from '../common/ConfirmModal';
 
 // ================= GLOBAL SCRIPT MODAL =================
 function GlobalScriptModal({ script, services = [], workspaceRoot = '', isOpen, onClose, onSave, currentThemeConfig = {}, accentColor = '#10b981' }) {
+  const [name, setName] = useState('');
+  const [command, setCommand] = useState('');
+  const [icon, setIcon] = useState('⚡');
+  const [cwdType, setCwdType] = useState('workspace');
+  const [customCwd, setCustomCwd] = useState(workspaceRoot);
+  const [rawEnv, setRawEnv] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      setErrorMsg('');
+      if (script) {
+        setName(script.name || '');
+        setCommand(script.command || '');
+        setIcon(script.icon || '⚡');
+        setCwdType(script.cwdType || 'workspace');
+        setCustomCwd(script.cwd || workspaceRoot);
+        setRawEnv(script.rawEnv || '');
+      } else {
+        setName('');
+        setCommand('');
+        setIcon('⚡');
+        setCwdType('workspace');
+        setCustomCwd(workspaceRoot);
+        setRawEnv('');
+      }
+    }
+  }, [isOpen, script, workspaceRoot]);
+
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e) => {
@@ -43,13 +74,6 @@ function GlobalScriptModal({ script, services = [], workspaceRoot = '', isOpen, 
   if (!isOpen) return null;
   const isEdit = !!script;
 
-  const [name, setName] = useState(script ? script.name : '');
-  const [command, setCommand] = useState(script ? script.command : '');
-  const [icon, setIcon] = useState(script ? script.icon : '⚡');
-  const [cwdType, setCwdType] = useState(script ? script.cwdType || 'workspace' : 'workspace');
-  const [customCwd, setCustomCwd] = useState(script ? script.cwd || '' : workspaceRoot);
-  const [rawEnv, setRawEnv] = useState(script ? script.rawEnv || '' : '');
-
   const effectiveCwd = cwdType === 'workspace'
     ? workspaceRoot
     : cwdType === 'custom'
@@ -59,9 +83,10 @@ function GlobalScriptModal({ script, services = [], workspaceRoot = '', isOpen, 
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!name.trim() || !command.trim()) {
-      alert('Vui lòng nhập Tên và Lệnh thực thi!');
+      setErrorMsg('Vui lòng nhập Tên và Lệnh thực thi!');
       return;
     }
+    setErrorMsg('');
 
     onSave({
       id: script?.id || `script_${Date.now()}`,
@@ -200,6 +225,12 @@ function GlobalScriptModal({ script, services = [], workspaceRoot = '', isOpen, 
             />
           </div>
 
+          {errorMsg && (
+            <p className="text-xs font-mono text-rose-400 p-2 rounded-lg bg-rose-950/30 border border-rose-800/40">
+              ⚠️ {errorMsg}
+            </p>
+          )}
+
           <div 
             className="flex justify-end gap-2 pt-2 border-t"
             style={{ borderColor: currentThemeConfig.border || '#27272a' }}
@@ -229,50 +260,6 @@ function GlobalScriptModal({ script, services = [], workspaceRoot = '', isOpen, 
   );
 }
 
-// Built-in System Tasks migrated from service-tool
-const SYSTEM_TASKS = [
-  {
-    id: 'migrate-all',
-    name: 'Run All Migrations',
-    icon: Database,
-    desc: 'Migrate cơ sở dữ liệu cho các sub-repos (acc, com, ntfc)',
-    badgeColor: '#f59e0b',
-    command: 'npm run migrate:all'
-  },
-  {
-    id: 'sync-all-protos',
-    name: 'Sync Protos',
-    icon: RefreshCw,
-    desc: 'Build & link proto repos (acc-proto & com-proto)',
-    badgeColor: '#a855f7',
-    command: 'npm run proto:sync'
-  },
-  {
-    id: 'git-pull',
-    name: 'Git Pull develop',
-    icon: GitPullRequest,
-    desc: 'Pull code mới nhất từ origin/develop cho toàn bộ sub-repos',
-    badgeColor: '#38bdf8',
-    command: 'git pull origin develop (all repos)'
-  },
-  {
-    id: 'yarn-install-all',
-    name: 'Yarn Install All',
-    icon: PackageCheck,
-    desc: 'Cài đặt node_modules yarn cho toàn bộ sub-repos',
-    badgeColor: '#10b981',
-    command: 'yarn install (all repos)'
-  },
-  {
-    id: 'clean-cache',
-    name: 'Clean Cache',
-    icon: Trash2,
-    desc: 'Dọn dẹp cache temp files và build artifacts của các services',
-    badgeColor: '#f43f5e',
-    command: 'clean temp cache & artifacts'
-  }
-];
-
 // ================= MAIN SCRIPTS VIEW (IN TOOLBOX) =================
 export default function ScriptsView({ 
   services = [], 
@@ -290,6 +277,7 @@ export default function ScriptsView({
   const [modalScript, setModalScript] = useState(undefined);
   const [searchQuery, setSearchQuery] = useState('');
   const [actionStatus, setActionStatus] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState(null);
 
   // Script Output Log Modal
   const [runningScript, setRunningScript] = useState(null);
@@ -313,7 +301,7 @@ export default function ScriptsView({
   const fetchScripts = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/scripts');
+      const res = await fetch(`${BASE_URL}/api/scripts`);
       const data = await res.json();
       if (data.success && Array.isArray(data.scripts)) {
         setScripts(data.scripts);
@@ -338,7 +326,7 @@ export default function ScriptsView({
 
   const handleSaveScript = async (scriptData) => {
     try {
-      const res = await fetch('/api/scripts', {
+      const res = await fetch(`${BASE_URL}/api/scripts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(scriptData)
@@ -349,31 +337,80 @@ export default function ScriptsView({
         setModalScript(undefined);
         await fetchScripts();
       } else {
-        alert('Lỗi: ' + data.error);
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Lỗi lưu script',
+          message: data?.error || 'Không thể lưu kịch bản này.',
+          isAlert: true,
+          danger: true,
+          type: 'danger',
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setConfirmDialog(null)
+        });
       }
     } catch (e) {
-      alert('Lỗi: ' + e.message);
+      setConfirmDialog({
+        isOpen: true,
+        title: 'Lỗi kết nối',
+        message: e?.message || String(e),
+        isAlert: true,
+        danger: true,
+        type: 'danger',
+        confirmText: 'Đã hiểu',
+        onConfirm: () => setConfirmDialog(null)
+      });
     }
     setTimeout(() => setActionStatus(''), 3000);
   };
 
-  const handleDeleteScript = async (scriptId, scriptName) => {
-    if (!confirm(`Bạn có chắc chắn muốn xóa script "${scriptName || scriptId}" không?`)) return;
-    try {
-      const res = await fetch(`/api/scripts/${encodeURIComponent(scriptId)}`, {
-        method: 'DELETE'
-      });
-      const data = await res.json();
-      if (data.success) {
-        setActionStatus(`✔ Đã xóa script "${scriptName || scriptId}"!`);
-        await fetchScripts();
-      } else {
-        alert('Lỗi xóa: ' + (data.error || 'Unknown error'));
-      }
-    } catch (e) {
-      alert('Lỗi: ' + e.message);
-    }
-    setTimeout(() => setActionStatus(''), 3000);
+  const handleDeleteScript = (scriptId, scriptName) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Xác nhận xóa script',
+      message: 'Bạn có chắc chắn muốn xóa kịch bản này không? Thao tác này không thể hoàn tác.',
+      itemName: scriptName || scriptId,
+      confirmText: 'Xóa script',
+      cancelText: 'Hủy',
+      danger: true,
+      type: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        try {
+          const res = await fetch(`${BASE_URL}/api/scripts/${encodeURIComponent(scriptId)}`, {
+            method: 'DELETE'
+          });
+          const data = await res.json();
+          if (data.success) {
+            setActionStatus(`✔ Đã xóa script "${scriptName || scriptId}"!`);
+            await fetchScripts();
+          } else {
+            setConfirmDialog({
+              isOpen: true,
+              title: 'Lỗi xóa script',
+              message: data?.error || 'Không thể xóa script.',
+              isAlert: true,
+              danger: true,
+              type: 'danger',
+              confirmText: 'Đã hiểu',
+              onConfirm: () => setConfirmDialog(null)
+            });
+          }
+        } catch (e) {
+          setConfirmDialog({
+            isOpen: true,
+            title: 'Lỗi kết nối',
+            message: e?.message || String(e),
+            isAlert: true,
+            danger: true,
+            type: 'danger',
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setConfirmDialog(null)
+          });
+        }
+        setTimeout(() => setActionStatus(''), 3000);
+      },
+      onCancel: () => setConfirmDialog(null)
+    });
   };
 
   const handleDuplicateScript = async (script) => {
@@ -391,7 +428,7 @@ export default function ScriptsView({
     setRunStatus('RUNNING');
 
     try {
-      const res = await fetch(`/api/scripts/${encodeURIComponent(script.id)}/run`, {
+      const res = await fetch(`${BASE_URL}/api/scripts/${encodeURIComponent(script.id)}/run`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -400,36 +437,6 @@ export default function ScriptsView({
         setRunStatus('SUCCESS');
       } else {
         setScriptLogs(prev => [...prev, { text: `❌ Lỗi khi thực thi script: ${data.error || 'Thất bại'}\n${data.output || ''}` }]);
-        setRunStatus('FAILED');
-      }
-    } catch (err) {
-      setScriptLogs(prev => [...prev, { text: `❌ Lỗi kết nối: ${err.message}` }]);
-      setRunStatus('FAILED');
-    }
-  };
-
-  const handleRunSystemTask = async (task) => {
-    if (onRunTask) {
-      onRunTask(task.id);
-    }
-
-    setRunningScript({
-      name: task.name,
-      icon: '⚡',
-      command: task.command,
-      cwd: 'Workspace Root'
-    });
-    setScriptLogs([{ text: `🚀 Đang khởi động tác vụ hệ thống: ${task.name}...\nCommand: ${task.command}\nDescription: ${task.desc}\n----------------------------------------\n` }]);
-    setRunStatus('RUNNING');
-
-    try {
-      const res = await fetch(`/api/tasks/${task.id}`, { method: 'POST' });
-      const data = await res.json();
-      if (data.success !== false) {
-        setScriptLogs(prev => [...prev, { text: data.output || data.message || `✔ Tác vụ ${task.name} hoàn thành thành công!` }]);
-        setRunStatus('SUCCESS');
-      } else {
-        setScriptLogs(prev => [...prev, { text: `❌ Lỗi khi thực thi tác vụ: ${data.error || 'Thất bại'}\n${data.output || ''}` }]);
         setRunStatus('FAILED');
       }
     } catch (err) {
@@ -465,10 +472,10 @@ export default function ScriptsView({
           <div className="space-y-1">
             <h2 className="text-base font-bold tracking-tight flex items-center gap-2" style={{ color: currentThemeConfig.text }}>
               <FileCode2 size={18} style={{ color: accentColor }} />
-              <span>Hộp Công Cụ: Quản Lý Scripts & Tác Vụ</span>
+              <span>Hộp Công Cụ: Quản Lý Scripts</span>
             </h2>
             <p className="text-xs" style={{ color: currentThemeConfig.textMuted }}>
-              Tập hợp các tác vụ hệ thống 1-click và các script tự động hóa tùy chỉnh cho microservices.
+              Tập hợp các script tự động hóa tùy chỉnh cho microservices.
             </p>
           </div>
 
@@ -496,80 +503,7 @@ export default function ScriptsView({
         </div>
       )}
 
-      {/* 2. SYSTEM QUICK TASKS SECTION (Migrated from Service Monitor) */}
-      <div 
-        className="border rounded-2xl p-5 shadow-md transition-all space-y-4"
-        style={{
-          backgroundColor: currentThemeConfig.card,
-          borderColor: currentThemeConfig.border
-        }}
-      >
-        <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: currentThemeConfig.border }}>
-          <div className="flex items-center gap-2">
-            <Activity size={16} style={{ color: accentColor }} />
-            <h3 className="text-xs font-bold uppercase tracking-wider font-mono" style={{ color: currentThemeConfig.text }}>
-              Tác Vụ Hệ Thống Tự Động (Service-Tool Tasks)
-            </h3>
-          </div>
-          <span className="text-[11px] font-mono px-2 py-0.5 rounded-full border" style={{ backgroundColor: currentThemeConfig.innerInput, borderColor: currentThemeConfig.border, color: currentThemeConfig.textMuted }}>
-            {SYSTEM_TASKS.length} tác vụ
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-          {SYSTEM_TASKS.map((task) => {
-            const Icon = task.icon;
-            const isThisRunning = currentRunningTask === task.id || (runningScript?.name === task.name && runStatus === 'RUNNING');
-
-            return (
-              <button
-                key={task.id}
-                disabled={isThisRunning}
-                onClick={() => handleRunSystemTask(task)}
-                className="flex flex-col justify-between p-3.5 rounded-xl border text-left transition-all active:scale-95 disabled:opacity-50 hover:border-sky-500/50 group"
-                style={{
-                  backgroundColor: currentThemeConfig.innerInput,
-                  borderColor: currentThemeConfig.border
-                }}
-              >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span 
-                      className="p-1.5 rounded-lg border flex items-center justify-center"
-                      style={{
-                        backgroundColor: `${task.badgeColor}15`,
-                        borderColor: `${task.badgeColor}35`,
-                        color: task.badgeColor
-                      }}
-                    >
-                      <Icon size={14} className={isThisRunning ? 'animate-spin' : ''} />
-                    </span>
-                    <span 
-                      className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px] font-mono font-semibold"
-                      style={{ color: accentColor }}
-                    >
-                      Chạy ➔
-                    </span>
-                  </div>
-                  <h4 className="font-mono text-xs font-bold tracking-tight" style={{ color: currentThemeConfig.text }}>
-                    {task.name}
-                  </h4>
-                  <p className="text-[10.5px] mt-1 leading-snug line-clamp-2" style={{ color: currentThemeConfig.textMuted }}>
-                    {task.desc}
-                  </p>
-                </div>
-
-                <div className="pt-2 mt-2 border-t flex items-center justify-between text-[9.5px] font-mono" style={{ borderColor: currentThemeConfig.border }}>
-                  <span style={{ color: currentThemeConfig.textMuted }}>1-click task</span>
-                  <span style={{ color: task.badgeColor }}>● sẵn sàng</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. CUSTOM SCRIPTS SECTION */}
+      {/* 2. CUSTOM SCRIPTS SECTION */}
       <div className="space-y-4">
         {/* Search & Counter Bar */}
         <div 
@@ -691,16 +625,18 @@ export default function ScriptsView({
       </div>
 
       {/* MODAL EDIT / CREATE */}
-      <GlobalScriptModal
-        script={modalScript}
-        services={services}
-        workspaceRoot={workspaceRoot}
-        isOpen={modalScript !== undefined}
-        onClose={() => setModalScript(undefined)}
-        onSave={handleSaveScript}
-        currentThemeConfig={currentThemeConfig}
-        accentColor={accentColor}
-      />
+      {modalScript !== undefined && (
+        <GlobalScriptModal
+          script={modalScript}
+          services={services}
+          workspaceRoot={workspaceRoot}
+          isOpen={modalScript !== undefined}
+          onClose={() => setModalScript(undefined)}
+          onSave={handleSaveScript}
+          currentThemeConfig={currentThemeConfig}
+          accentColor={accentColor}
+        />
+      )}
 
       {/* SCRIPT / TASK RUN OUTPUT LOG MODAL */}
       {runningScript && (
@@ -789,6 +725,14 @@ export default function ScriptsView({
             </div>
           </div>
         </div>
+      )}
+
+      {/* CONFIRM / ALERT POPUP */}
+      {confirmDialog?.isOpen && (
+        <ConfirmModal
+          {...confirmDialog}
+          settings={settings}
+        />
       )}
     </div>
   );

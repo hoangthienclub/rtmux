@@ -241,10 +241,27 @@ export default function DockerView({
     try {
       const res = await fetchRemoteDockerContainers(hostName, isWsl);
       if (Array.isArray(res)) {
-        setContainers(res.map(c => ({
-          ...c,
-          state: (c.state || '').toUpperCase().includes('RUNNING') ? 'RUNNING' : 'STOPPED'
-        })));
+        setContainers((prev) => {
+          const map = new Map(res.map((c) => [c.id, c]));
+          const updated = prev.map((c) => {
+            const fresh = map.get(c.id);
+            if (!fresh) return c;
+            return {
+              ...c,
+              ...fresh,
+              state: (fresh.state || '').toUpperCase().includes('RUNNING') ? 'RUNNING' : 'STOPPED'
+            };
+          });
+          for (const c of res) {
+            if (!prev.some((p) => p.id === c.id)) {
+              updated.push({
+                ...c,
+                state: (c.state || '').toUpperCase().includes('RUNNING') ? 'RUNNING' : 'STOPPED'
+              });
+            }
+          }
+          return updated;
+        });
       }
     } catch (err) {
       console.warn('Failed to refresh containers silently:', err);
