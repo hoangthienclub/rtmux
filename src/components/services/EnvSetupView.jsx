@@ -679,6 +679,7 @@ function EditProfileModal({ isOpen, onClose, profile, onSave, currentThemeConfig
 function ProfilesManagerPane({
   globalProfiles = {},
   activeGlobalProfile = 'default',
+  dataFilePath = '',
   services = [],
   onSetActiveProfile,
   onOpenCreateModal,
@@ -725,8 +726,17 @@ function ProfilesManagerPane({
                 {profileEntries.length} profiles
               </span>
             </h3>
-            <p className="text-xs" style={{ color: currentThemeConfig.textMuted }}>
-              Đồng bộ Profile giữa Global Env và tất cả microservices. Khi khởi chạy, application sẽ nhận đúng profile được chọn.
+            <p className="text-xs flex items-center gap-2 flex-wrap" style={{ color: currentThemeConfig.textMuted }}>
+              <span>Đồng bộ Profile giữa Global Env và tất cả microservices.</span>
+              {dataFilePath && (
+                <span 
+                  className="font-mono text-[10px] px-2 py-0.5 rounded border inline-flex items-center gap-1 opacity-80"
+                  style={{ backgroundColor: `${currentThemeConfig.card}`, borderColor: currentThemeConfig.border }}
+                  title="Vị trí lưu trữ cấu hình chuẩn trên hệ điều hành (không bị xóa khi xóa app)"
+                >
+                  📁 Lưu tại: {dataFilePath}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -916,6 +926,7 @@ export default function EnvSetupView({
   const [globalProfiles, setGlobalProfiles] = useState({ default: { env: {} } });
   const [activeGlobalProfile, setActiveGlobalProfile] = useState('default');
   const [globalEnvPairs, setGlobalEnvPairs] = useState([]);
+  const [dataFilePath, setDataFilePath] = useState('');
 
   // Modals & Profile Management State
   const [showNewProfileModal, setShowNewProfileModal] = useState(false);
@@ -955,6 +966,7 @@ export default function EnvSetupView({
         if (data.success) {
           if (data.globalProfiles) setGlobalProfiles(data.globalProfiles);
           if (data.activeGlobalProfile) setActiveGlobalProfile(data.activeGlobalProfile);
+          if (data.dataFilePath) setDataFilePath(data.dataFilePath);
           const env = data.globalEnv || {};
           const pairs = Object.entries(env).map(([key, value]) => ({
             key,
@@ -1608,6 +1620,7 @@ export default function EnvSetupView({
           <ProfilesManagerPane
             globalProfiles={globalProfiles}
             activeGlobalProfile={activeGlobalProfile}
+            dataFilePath={dataFilePath}
             services={services}
             onSetActiveProfile={handleSetActiveProfileGlobal}
             onOpenCreateModal={() => setShowNewProfileModal(true)}
