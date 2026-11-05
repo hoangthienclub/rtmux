@@ -1815,6 +1815,11 @@ export default function App() {
           isOpen={!!envModalService}
           onClose={() => setEnvModalService(null)}
           onSaveOverrides={handleSaveEnvOverrides}
+          onOpenFullEnvConfig={(svc) => {
+            setEnvModalService(null);
+            setSelectedServiceId(svc.id);
+            setCurrentNav('env_vars');
+          }}
           settings={settings}
         />
       )}

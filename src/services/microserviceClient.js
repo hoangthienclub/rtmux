@@ -123,6 +123,13 @@ export async function browseDirectory({ prompt = 'Chọn thư mục:', defaultDi
   });
 }
 
+export async function browseFile({ prompt = 'Chọn file script:', defaultDir = '', isWsl = false, wslDistro = 'Ubuntu' } = {}) {
+  return await request('/api/browse-file', {
+    method: 'POST',
+    body: JSON.stringify({ prompt, defaultDir, isWsl, wslDistro })
+  });
+}
+
 export function convertWindowsToWslPath(winPath, distro = 'Ubuntu-24.04') {
   if (!winPath) return '';
   let p = winPath.replace(/\\/g, '/');

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Plus, Trash2, CheckCircle, Sliders } from 'lucide-react';
 import { THEME_CONFIGS } from '../../constants/palettes';
 
-export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, settings = {} }) {
+export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, onOpenFullEnvConfig, settings = {} }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
   const accentColor = settings?.accentColor || '#10b981';
 
@@ -45,7 +45,7 @@ export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, se
     for (const item of envPairs) {
       overrides[item.key] = item.value;
     }
-    await onSaveOverrides(service.id, overrides);
+    await onSaveOverrides(service.id, overrides, service.activeProfile || 'default');
     setSavedSuccess(true);
     setTimeout(() => {
       setSavedSuccess(false);
@@ -226,9 +226,23 @@ export default function EnvModal({ service, isOpen, onClose, onSaveOverrides, se
             borderColor: currentThemeConfig.border || '#27272a'
           }}
         >
-          <span className="text-xs" style={{ color: currentThemeConfig.textMuted || '#a1a1aa' }}>
-            * Các thay đổi sẽ được lưu vào cấu hình cá nhân và tự động áp dụng khi khởi động service.
-          </span>
+          <div className="flex items-center gap-2">
+            {onOpenFullEnvConfig && (
+              <button
+                type="button"
+                onClick={() => onOpenFullEnvConfig(service)}
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl border transition-all hover:text-white cursor-pointer"
+                style={{
+                  backgroundColor: currentThemeConfig.card || '#18181b',
+                  borderColor: currentThemeConfig.border || '#27272a',
+                  color: accentColor
+                }}
+                title="Mở giao diện Cấu Hình Biến Môi Trường đầy đủ (Profiles, Raw .env, Sao chép env)"
+              >
+                ⚙️ Mở Cấu Hình Đầy Đủ...
+              </button>
+            )}
+          </div>
           <div className="flex items-center space-x-3">
             <button
               onClick={onClose}
