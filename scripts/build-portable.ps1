@@ -1,8 +1,12 @@
 # ==============================================================================
-# RTMUX Portable Windows Single-File Builder
+# RTMUX Portable Windows Builder
 # Creates:
-# 1. rtmux-portable.exe (Single-file standalone launcher)
-# 2. rtmux-windows-portable.zip (Standalone zip distribution)
+# [1] Standard / Slim Edition (No bundled VPN ~5MB):
+#     - rtmux-portable.exe
+#     - rtmux-windows-portable.zip
+# [2] Full / VPN Edition (Bundled OpenVPN + Wintun ~14MB):
+#     - rtmux-portable-vpn.exe
+#     - rtmux-windows-portable-vpn.zip
 # ==============================================================================
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -134,50 +138,71 @@ namespace RtmuxPortable
 $launcherFile = "$OutputDir\windows\Launcher.cs"
 Set-Content -Path $launcherFile -Value $launcherSource -Encoding UTF8
 
-$portableExe = "$OutputDir\windows\rtmux-portable.exe"
-$resArgs = @(
+# ==============================================================================
+# 1. BUILD SLIM / STANDARD EDITION (No VPN Engine ~5MB)
+# ==============================================================================
+Write-Host "Compiling Standard / Slim Portable (No VPN)..." -ForegroundColor Cyan
+$slimExe = "$OutputDir\windows\rtmux-portable.exe"
+$slimArgs = @(
     "/resource:`"$OutputDir\windows\rtmux-desktop.exe`",rtmux-desktop.exe"
 )
 if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
-    $resArgs += "/resource:`"$OutputDir\windows\WebView2Loader.dll`",WebView2Loader.dll"
-}
-if (Test-Path "$OutputDir\windows\openvpn.exe") {
-    $resArgs += "/resource:`"$OutputDir\windows\openvpn.exe`",openvpn.exe"
-    $resArgs += "/resource:`"$OutputDir\windows\libcrypto-3-x64.dll`",libcrypto-3-x64.dll"
-    $resArgs += "/resource:`"$OutputDir\windows\libssl-3-x64.dll`",libssl-3-x64.dll"
-    $resArgs += "/resource:`"$OutputDir\windows\libpkcs11-helper-1.dll`",libpkcs11-helper-1.dll"
-    $resArgs += "/resource:`"$OutputDir\windows\vcruntime140.dll`",vcruntime140.dll"
-}
-if (Test-Path "$OutputDir\windows\wintun.dll") {
-    $resArgs += "/resource:`"$OutputDir\windows\wintun.dll`",wintun.dll"
+    $slimArgs += "/resource:`"$OutputDir\windows\WebView2Loader.dll`",WebView2Loader.dll"
 }
 
-Write-Host "Compiling portable single-file exe..." -ForegroundColor Yellow
-& $csc /target:winexe /optimize+ /win32icon:$icon $resArgs /out:$portableExe $launcherFile /r:System.Windows.Forms.dll
+& $csc /target:winexe /optimize+ /win32icon:$icon $slimArgs /out:$slimExe $launcherFile /r:System.Windows.Forms.dll
+
+$slimZipPath = "$OutputDir\windows\rtmux-windows-portable.zip"
+if (Test-Path $slimZipPath) { Remove-Item $slimZipPath -Force }
+$slimZipFiles = @("$OutputDir\windows\rtmux-desktop.exe")
+if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
+    $slimZipFiles += "$OutputDir\windows\WebView2Loader.dll"
+}
+Compress-Archive -Path $slimZipFiles -DestinationPath $slimZipPath -Force
+
+# ==============================================================================
+# 2. BUILD FULL / VPN EDITION (With OpenVPN + Wintun ~14MB)
+# ==============================================================================
+if (Test-Path "$OutputDir\windows\openvpn.exe") {
+    Write-Host "Compiling Full / VPN Portable (With OpenVPN + Wintun)..." -ForegroundColor Green
+    $vpnExe = "$OutputDir\windows\rtmux-portable-vpn.exe"
+    $vpnArgs = @(
+        "/resource:`"$OutputDir\windows\rtmux-desktop.exe`",rtmux-desktop.exe"
+    )
+    if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
+        $vpnArgs += "/resource:`"$OutputDir\windows\WebView2Loader.dll`",WebView2Loader.dll"
+    }
+    $vpnArgs += "/resource:`"$OutputDir\windows\openvpn.exe`",openvpn.exe"
+    $vpnArgs += "/resource:`"$OutputDir\windows\libcrypto-3-x64.dll`",libcrypto-3-x64.dll"
+    $vpnArgs += "/resource:`"$OutputDir\windows\libssl-3-x64.dll`",libssl-3-x64.dll"
+    $vpnArgs += "/resource:`"$OutputDir\windows\libpkcs11-helper-1.dll`",libpkcs11-helper-1.dll"
+    $vpnArgs += "/resource:`"$OutputDir\windows\vcruntime140.dll`",vcruntime140.dll"
+    if (Test-Path "$OutputDir\windows\wintun.dll") {
+        $vpnArgs += "/resource:`"$OutputDir\windows\wintun.dll`",wintun.dll"
+    }
+
+    & $csc /target:winexe /optimize+ /win32icon:$icon $vpnArgs /out:$vpnExe $launcherFile /r:System.Windows.Forms.dll
+
+    $vpnZipPath = "$OutputDir\windows\rtmux-windows-portable-vpn.zip"
+    if (Test-Path $vpnZipPath) { Remove-Item $vpnZipPath -Force }
+    $vpnZipFiles = @(
+        "$OutputDir\windows\rtmux-desktop.exe",
+        "$OutputDir\windows\openvpn.exe",
+        "$OutputDir\windows\libcrypto-3-x64.dll",
+        "$OutputDir\windows\libssl-3-x64.dll",
+        "$OutputDir\windows\libpkcs11-helper-1.dll",
+        "$OutputDir\windows\vcruntime140.dll"
+    )
+    if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
+        $vpnZipFiles += "$OutputDir\windows\WebView2Loader.dll"
+    }
+    if (Test-Path "$OutputDir\windows\wintun.dll") {
+        $vpnZipFiles += "$OutputDir\windows\wintun.dll"
+    }
+    Compress-Archive -Path $vpnZipFiles -DestinationPath $vpnZipPath -Force
+}
+
 Remove-Item $launcherFile -Force -ErrorAction SilentlyContinue
 
-Write-Host "Compressing portable zip package..." -ForegroundColor Yellow
-$zipPath = "$OutputDir\windows\rtmux-windows-portable.zip"
-if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-
-$zipFiles = @(
-    "$OutputDir\windows\rtmux-desktop.exe"
-)
-if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
-    $zipFiles += "$OutputDir\windows\WebView2Loader.dll"
-}
-if (Test-Path "$OutputDir\windows\openvpn.exe") {
-    $zipFiles += "$OutputDir\windows\openvpn.exe"
-    $zipFiles += "$OutputDir\windows\libcrypto-3-x64.dll"
-    $zipFiles += "$OutputDir\windows\libssl-3-x64.dll"
-    $zipFiles += "$OutputDir\windows\libpkcs11-helper-1.dll"
-    $zipFiles += "$OutputDir\windows\vcruntime140.dll"
-}
-if (Test-Path "$OutputDir\windows\wintun.dll") {
-    $zipFiles += "$OutputDir\windows\wintun.dll"
-}
-
-Compress-Archive -Path $zipFiles -DestinationPath $zipPath -Force
-
-Write-Host "PORTABLE BUILD COMPLETED SUCCESSFULLY!" -ForegroundColor Green
-Get-Item "$OutputDir\windows\rtmux-portable.exe", "$OutputDir\windows\rtmux-windows-portable.zip" | Select-Object FullName, Length, LastWriteTime
+Write-Host "PORTABLE BUILDS COMPLETED SUCCESSFULLY!" -ForegroundColor Green
+Get-Item "$OutputDir\windows\rtmux-portable*.exe", "$OutputDir\windows\rtmux-windows-portable*.zip" | Select-Object Name, Length, LastWriteTime

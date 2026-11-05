@@ -11,7 +11,8 @@ src-tauri/**/target/
 node_modules/
 dist/
 dist-build/
-bin/
+bin/*
+!bin/openvpn_portable/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -19,7 +20,9 @@ pnpm-debug.log*
 
 # 3. Binaries, Archives & Installers
 *.exe
+!bin/openvpn_portable/*.exe
 *.dll
+!bin/openvpn_portable/*.dll
 *.so
 *.dylib
 *.zip

@@ -25,8 +25,9 @@ Hệ thống sẽ tự động kích hoạt 2 công đoạn:
 3 runner máy chủ GitHub chạy song song để đóng gói cả **Bản Cài Đặt (Installers)** và **Bản Portable Chạy Ngay (Portable Releases)**:
 
 1. **🪟 Windows (`windows-latest`):**
-   - 🚀 **`rtmux-portable.exe`**: Bản Portable 1 file độc lập duy nhất (Single-file launcher nhúng sẵn WebView2/OpenVPN), tải về bấm là chạy ngay không cần cài đặt.
-   - 📦 **`rtmux-windows-portable.zip`**: Bản Portable dạng thư mục nén zip.
+   - 🚀 **`rtmux-portable.exe`**: Bản Portable Tiêu Chuẩn (~5MB), siêu nhẹ, bấm chạy ngay (không kèm engine VPN).
+   - 🛡️ **`rtmux-portable-vpn.exe`**: Bản Portable Đầy Đủ Tích Hợp VPN (~14MB), kèm sẵn OpenVPN engine + Wintun driver ngầm.
+   - 📦 **`rtmux-windows-portable.zip`** & **`rtmux-windows-portable-vpn.zip`**: Bản Portable dạng thư mục nén zip tương ứng.
    - 💿 File cài đặt chuẩn: `.exe` (NSIS Setup) và `.msi` (WiX Enterprise Installer).
 2. **🍏 macOS (`macos-latest`):**
    - 🚀 **`rtmux-macos-portable.zip`**: Bản Portable nén `.app` chạy ngay không cần cài đặt.

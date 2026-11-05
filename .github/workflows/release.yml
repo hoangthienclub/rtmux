@@ -123,6 +123,8 @@ jobs:
           files: |
             dist-build/windows/rtmux-portable.exe
             dist-build/windows/rtmux-windows-portable.zip
+            dist-build/windows/rtmux-portable-vpn.exe
+            dist-build/windows/rtmux-windows-portable-vpn.zip
 
       # 2. Linux Portable (Standalone tar.gz executable)
       - name: Package Linux Portable Archive

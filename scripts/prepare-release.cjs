@@ -85,8 +85,9 @@ function main() {
 
   changelog += `\n---\n### 📥 Danh Sách File Cài Đặt & Bản Portable (Artifacts):\n`;
   changelog += `- **🪟 Windows:**\n`;
-  changelog += `  - 🚀 **\`rtmux-portable.exe\`**: Bản Portable 1 file duy nhất, bấm chạy ngay không cần cài đặt.\n`;
-  changelog += `  - 📦 **\`rtmux-windows-portable.zip\`**: Gói nén Portable zip.\n`;
+  changelog += `  - 🚀 **\`rtmux-portable.exe\`**: Bản Portable Tiêu Chuẩn (~5MB), siêu nhẹ, bấm chạy ngay (không kèm engine VPN).\n`;
+  changelog += `  - 🛡️ **\`rtmux-portable-vpn.exe\`**: Bản Portable Đầy Đủ Tích Hợp VPN (~14MB), kèm sẵn OpenVPN engine + Wintun driver ngầm.\n`;
+  changelog += `  - 📦 **\`rtmux-windows-portable.zip\`** & **\`rtmux-windows-portable-vpn.zip\`**: Gói nén Portable zip tương ứng.\n`;
   changelog += `  - 💿 File cài đặt chuẩn: \`.msi\` (WiX) và \`.exe\` (NSIS Setup).\n`;
   changelog += `- **🍏 macOS:**\n`;
   changelog += `  - 🚀 **\`rtmux-macos-portable.zip\`**: Bản Portable nén chạy ngay.\n`;
