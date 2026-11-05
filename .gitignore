@@ -51,6 +51,7 @@ logs/
 *.pid
 *.tmp
 *.temp
+RELEASE_NOTES.md
 
 # 7. OS & IDE Configuration
 .DS_Store

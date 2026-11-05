@@ -1,9 +1,37 @@
-$RootDir = "z:\home\thientran\projects\tools\rtmux-desktop"
+# ==============================================================================
+# RTMUX Portable Windows Single-File Builder
+# Creates:
+# 1. rtmux-portable.exe (Single-file standalone launcher)
+# 2. rtmux-windows-portable.zip (Standalone zip distribution)
+# ==============================================================================
+
+$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$RootDir = Split-Path -Parent $ScriptDir
 $OutputDir = Join-Path $RootDir "dist-build"
-$WinExeSrc = Join-Path $RootDir "src-tauri\target\x86_64-pc-windows-gnu\release\rtmux-desktop.exe"
-$WinDllSrc = Join-Path $RootDir "src-tauri\target\x86_64-pc-windows-gnu\release\WebView2Loader.dll"
+
+# Detect binary location: target\release (MSVC / GitHub Actions) or target\x86_64-pc-windows-gnu\release (MinGW)
+$WinExeSrc = Join-Path $RootDir "src-tauri\target\release\rtmux-desktop.exe"
+if (-not (Test-Path $WinExeSrc)) {
+    $WinExeSrc = Join-Path $RootDir "src-tauri\target\x86_64-pc-windows-gnu\release\rtmux-desktop.exe"
+}
+
+$WinDllSrc = Join-Path $RootDir "src-tauri\target\release\WebView2Loader.dll"
+if (-not (Test-Path $WinDllSrc)) {
+    $WinDllSrc = Join-Path $RootDir "src-tauri\target\x86_64-pc-windows-gnu\release\WebView2Loader.dll"
+}
+
 $icon = Join-Path $RootDir "src-tauri\icons\icon.ico"
+
+# Detect C# Compiler (csc.exe)
 $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+if (-not (Test-Path $csc)) {
+    $csc = "C:\Windows\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+}
+
+if (-not (Test-Path $WinExeSrc)) {
+    Write-Error "Cannot find source binary: $WinExeSrc. Please build Tauri first."
+    exit 1
+}
 
 New-Item -ItemType Directory -Path "$OutputDir\windows" -Force | Out-Null
 
@@ -43,6 +71,7 @@ namespace RtmuxPortable
                 ExtractResource("libssl-3-x64.dll", Path.Combine(targetDir, "libssl-3-x64.dll"));
                 ExtractResource("libpkcs11-helper-1.dll", Path.Combine(targetDir, "libpkcs11-helper-1.dll"));
                 ExtractResource("vcruntime140.dll", Path.Combine(targetDir, "vcruntime140.dll"));
+                ExtractResource("wintun.dll", Path.Combine(targetDir, "wintun.dll"));
 
                 string targetExe = Path.Combine(targetDir, "rtmux-desktop.exe");
                 ProcessStartInfo psi = new ProcessStartInfo(targetExe);
@@ -107,15 +136,20 @@ Set-Content -Path $launcherFile -Value $launcherSource -Encoding UTF8
 
 $portableExe = "$OutputDir\windows\rtmux-portable.exe"
 $resArgs = @(
-    "/resource:`"$OutputDir\windows\rtmux-desktop.exe`",rtmux-desktop.exe",
-    "/resource:`"$OutputDir\windows\WebView2Loader.dll`",WebView2Loader.dll"
+    "/resource:`"$OutputDir\windows\rtmux-desktop.exe`",rtmux-desktop.exe"
 )
+if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
+    $resArgs += "/resource:`"$OutputDir\windows\WebView2Loader.dll`",WebView2Loader.dll"
+}
 if (Test-Path "$OutputDir\windows\openvpn.exe") {
     $resArgs += "/resource:`"$OutputDir\windows\openvpn.exe`",openvpn.exe"
     $resArgs += "/resource:`"$OutputDir\windows\libcrypto-3-x64.dll`",libcrypto-3-x64.dll"
     $resArgs += "/resource:`"$OutputDir\windows\libssl-3-x64.dll`",libssl-3-x64.dll"
     $resArgs += "/resource:`"$OutputDir\windows\libpkcs11-helper-1.dll`",libpkcs11-helper-1.dll"
     $resArgs += "/resource:`"$OutputDir\windows\vcruntime140.dll`",vcruntime140.dll"
+}
+if (Test-Path "$OutputDir\windows\wintun.dll") {
+    $resArgs += "/resource:`"$OutputDir\windows\wintun.dll`",wintun.dll"
 }
 
 Write-Host "Compiling portable single-file exe..." -ForegroundColor Yellow
@@ -127,9 +161,11 @@ $zipPath = "$OutputDir\windows\rtmux-windows-portable.zip"
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 
 $zipFiles = @(
-    "$OutputDir\windows\rtmux-desktop.exe",
-    "$OutputDir\windows\WebView2Loader.dll"
+    "$OutputDir\windows\rtmux-desktop.exe"
 )
+if (Test-Path "$OutputDir\windows\WebView2Loader.dll") {
+    $zipFiles += "$OutputDir\windows\WebView2Loader.dll"
+}
 if (Test-Path "$OutputDir\windows\openvpn.exe") {
     $zipFiles += "$OutputDir\windows\openvpn.exe"
     $zipFiles += "$OutputDir\windows\libcrypto-3-x64.dll"
@@ -137,7 +173,11 @@ if (Test-Path "$OutputDir\windows\openvpn.exe") {
     $zipFiles += "$OutputDir\windows\libpkcs11-helper-1.dll"
     $zipFiles += "$OutputDir\windows\vcruntime140.dll"
 }
+if (Test-Path "$OutputDir\windows\wintun.dll") {
+    $zipFiles += "$OutputDir\windows\wintun.dll"
+}
+
 Compress-Archive -Path $zipFiles -DestinationPath $zipPath -Force
 
-Write-Host "BUILD COMPLETED SUCCESSFULLY!" -ForegroundColor Green
+Write-Host "PORTABLE BUILD COMPLETED SUCCESSFULLY!" -ForegroundColor Green
 Get-Item "$OutputDir\windows\rtmux-portable.exe", "$OutputDir\windows\rtmux-windows-portable.zip" | Select-Object FullName, Length, LastWriteTime

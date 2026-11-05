@@ -1,4 +1,4 @@
-# 🚀 Hướng Dẫn Phát Hành Tự Động (CI/CD Multi-OS Release)
+# 🚀 Hướng Dẫn Phát Hành Tự Động (CI/CD Multi-OS & Portable Release)
 
 Hệ thống CI/CD của RTMUX Desktop được thiết lập hoàn toàn tự động bằng **GitHub Actions** tại file [`.github/workflows/release.yml`](.github/workflows/release.yml).
 
@@ -18,20 +18,24 @@ Hệ thống sẽ tự động kích hoạt 2 công đoạn:
 - Tự động kiểm tra Git Tag:
   - Nếu tag `v0.1.0` chưa có, tạo tag `v0.1.0`.
   - Nếu đã có (push nhiều commit trong cùng version), tự động gắn `v0.1.0-b<run_number>` để không bị xung đột tag.
-- Phân tích toàn bộ commit log kể từ bản phát hành trước để tự động sinh **Changelog** phân loại rõ ràng (Features, Bug Fixes, Improvements).
+- Phân tích toàn bộ commit log kể từ bản phát hành trước để tự động sinh **Changelog** phân loại rõ ràng (Features, Bug Fixes, Improvements, Other Changes).
 - Tạo GitHub Release tương ứng.
 
 ### Bước 2: Ma Trận Biên Dịch Song Song (`build-tauri`)
-3 runner máy chủ GitHub chạy song song để đóng gói:
+3 runner máy chủ GitHub chạy song song để đóng gói cả **Bản Cài Đặt (Installers)** và **Bản Portable Chạy Ngay (Portable Releases)**:
+
 1. **🪟 Windows (`windows-latest`):**
-   - File cài đặt `.exe` (NSIS Installer)
-   - File cài đặt doanh nghiệp `.msi` (WiX)
+   - 🚀 **`rtmux-portable.exe`**: Bản Portable 1 file độc lập duy nhất (Single-file launcher nhúng sẵn WebView2/OpenVPN), tải về bấm là chạy ngay không cần cài đặt.
+   - 📦 **`rtmux-windows-portable.zip`**: Bản Portable dạng thư mục nén zip.
+   - 💿 File cài đặt chuẩn: `.exe` (NSIS Setup) và `.msi` (WiX Enterprise Installer).
 2. **🍏 macOS (`macos-latest`):**
-   - File cài đặt `.dmg` (kéo thả vào Applications)
-   - File nén `.app.tar.gz`
+   - 🚀 **`rtmux-macos-portable.zip`**: Bản Portable nén `.app` chạy ngay không cần cài đặt.
+   - 📦 **`rtmux-macos-portable.tar.gz`**: Bản nén tarball bảo toàn symlink và unix permissions.
+   - 💿 File cài đặt chuẩn: `.dmg` (kéo thả vào Applications) và `.app.tar.gz`.
 3. **🐧 Linux (`ubuntu-22.04`):**
-   - File chạy ngay `.AppImage` (không cần cài đặt, chạy được trên mọi distro)
-   - Gói cài đặt `.deb` (cho Ubuntu, Debian, Mint...)
+   - 🚀 **`rtmux-desktop.AppImage`**: File Portable chạy ngay trên mọi distro Linux (Ubuntu, Debian, Fedora, Arch...).
+   - 📦 **`rtmux-linux-x86_64-portable.tar.gz`**: Bản nén portable nhị phân x86_64 đã set quyền thực thi `chmod +x`.
+   - 💿 Gói cài đặt chuẩn: `.deb` (cho Ubuntu, Debian, Mint...).
 
 Tất cả các file thành phẩm sẽ được tự động đính kèm trực tiếp vào mục **Assets** của GitHub Release để người dùng tải về!
 
@@ -62,4 +66,4 @@ Khi chuẩn bị ra mắt một phiên bản mới (ví dụ từ `0.1.0` lên `
    git commit -am "chore: bump version to 0.2.0"
    git push origin main
    ```
-5. GitHub Actions sẽ tự động tạo Release **`RTMUX Desktop v0.2.0`** kèm changelog và 3 bản cài đặt Windows, Mac, Linux.
+5. GitHub Actions sẽ tự động tạo Release **`RTMUX Desktop v0.2.0`** kèm changelog và toàn bộ file Portable + Installers cho 3 hệ điều hành Windows, Mac, Linux.

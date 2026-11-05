@@ -83,10 +83,18 @@ function main() {
     changelog += `\n`;
   }
 
-  changelog += `\n---\n### 📥 Danh Sách File Cài Đặt (Artifacts):\n`;
-  changelog += `- **🪟 Windows:** File cài đặt \`.msi\` và \`.exe\` (NSIS Installer) tương thích Windows 10/11 x64\n`;
-  changelog += `- **🍏 macOS:** File cài đặt \`.dmg\` và \`.app.tar.gz\` (Universal / Apple Silicon & Intel)\n`;
-  changelog += `- **🐧 Linux:** File chạy ngay \`.AppImage\` và gói \`.deb\` cho Ubuntu/Debian\n`;
+  changelog += `\n---\n### 📥 Danh Sách File Cài Đặt & Bản Portable (Artifacts):\n`;
+  changelog += `- **🪟 Windows:**\n`;
+  changelog += `  - 🚀 **\`rtmux-portable.exe\`**: Bản Portable 1 file duy nhất, bấm chạy ngay không cần cài đặt.\n`;
+  changelog += `  - 📦 **\`rtmux-windows-portable.zip\`**: Gói nén Portable zip.\n`;
+  changelog += `  - 💿 File cài đặt chuẩn: \`.msi\` (WiX) và \`.exe\` (NSIS Setup).\n`;
+  changelog += `- **🍏 macOS:**\n`;
+  changelog += `  - 🚀 **\`rtmux-macos-portable.zip\`**: Bản Portable nén chạy ngay.\n`;
+  changelog += `  - 💿 File cài đặt chuẩn: \`.dmg\` và \`.app.tar.gz\` (Universal / Apple Silicon & Intel).\n`;
+  changelog += `- **🐧 Linux:**\n`;
+  changelog += `  - 🚀 **\`rtmux-desktop.AppImage\`**: File Portable chạy ngay trên mọi distro Linux.\n`;
+  changelog += `  - 📦 **\`rtmux-linux-x86_64-portable.tar.gz\`**: Gói Portable tar.gz.\n`;
+  changelog += `  - 💿 Gói cài đặt chuẩn: \`.deb\` cho Ubuntu/Debian.\n`;
 
   // Write release notes file
   const notesFile = path.join(rootDir, 'RELEASE_NOTES.md');
