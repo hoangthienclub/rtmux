@@ -30,9 +30,13 @@ Hệ thống sẽ tự động kích hoạt 2 công đoạn:
    - 📦 **`rtmux-windows-portable.zip`** & **`rtmux-windows-portable-vpn.zip`**: Bản Portable dạng thư mục nén zip tương ứng.
    - 💿 File cài đặt chuẩn: `.exe` (NSIS Setup) và `.msi` (WiX Enterprise Installer).
 2. **🍏 macOS (`macos-latest`):**
-   - 🚀 **`rtmux-macos-portable.zip`**: Bản Portable nén `.app` chạy ngay không cần cài đặt.
+   - 🚀 **`rtmux-macos-portable.zip`**: Bản Portable nén `.app` chạy ngay (kèm script `Open-App-If-Blocked.command` tự động gỡ cờ Gatekeeper).
    - 📦 **`rtmux-macos-portable.tar.gz`**: Bản nén tarball bảo toàn symlink và unix permissions.
-   - 💿 File cài đặt chuẩn: `.dmg` (kéo thả vào Applications) và `.app.tar.gz`.
+   - 💿 File cài đặt chuẩn: `.dmg` (kéo thả vào Applications) và `.app.tar.gz` (Universal Binary cho cả Apple Silicon M1/M2/M3/M4 và Intel).
+   - 💡 **Mẹo mở app trên macOS:** Nếu macOS hiện cảnh báo *"App is damaged and can't be opened. You should move it to the trash"*, chỉ cần chạy 1 lệnh trong Terminal:
+     ```bash
+     xattr -cr "/Applications/rtmux-desktop.app"
+     ```
 3. **🐧 Linux (`ubuntu-22.04`):**
    - 🚀 **`rtmux-desktop.AppImage`**: File Portable chạy ngay trên mọi distro Linux (Ubuntu, Debian, Fedora, Arch...).
    - 📦 **`rtmux-linux-x86_64-portable.tar.gz`**: Bản nén portable nhị phân x86_64 đã set quyền thực thi `chmod +x`.

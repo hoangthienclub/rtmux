@@ -90,8 +90,9 @@ function main() {
   changelog += `  - 📦 **\`rtmux-windows-portable.zip\`** & **\`rtmux-windows-portable-vpn.zip\`**: Gói nén Portable zip tương ứng.\n`;
   changelog += `  - 💿 File cài đặt chuẩn: \`.msi\` (WiX) và \`.exe\` (NSIS Setup).\n`;
   changelog += `- **🍏 macOS:**\n`;
-  changelog += `  - 🚀 **\`rtmux-macos-portable.zip\`**: Bản Portable nén chạy ngay.\n`;
-  changelog += `  - 💿 File cài đặt chuẩn: \`.dmg\` và \`.app.tar.gz\` (Universal / Apple Silicon & Intel).\n`;
+  changelog += `  - 🚀 **\`rtmux-macos-portable.zip\`**: Bản Portable nén chạy ngay kèm script mở nhanh.\n`;
+  changelog += `  - 💿 File cài đặt chuẩn: \`.dmg\` và \`.app.tar.gz\` (Universal Binary hỗ trợ cả Mac Intel & Apple Silicon M1/M2/M3/M4).\n`;
+  changelog += `  - 💡 *Lưu ý macOS:* Nếu gặp thông báo *"App is damaged and can't be opened"* do Gatekeeper chặn app nguồn mở, chỉ cần mở Terminal chạy: \`xattr -cr /Applications/rtmux-desktop.app\` (hoặc bấm đúp file \`Open-App-If-Blocked.command\` trong bản zip).\n`;
   changelog += `- **🐧 Linux:**\n`;
   changelog += `  - 🚀 **\`rtmux-desktop.AppImage\`**: File Portable chạy ngay trên mọi distro Linux.\n`;
   changelog += `  - 📦 **\`rtmux-linux-x86_64-portable.tar.gz\`**: Gói Portable tar.gz.\n`;
