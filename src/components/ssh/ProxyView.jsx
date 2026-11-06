@@ -52,6 +52,7 @@ export default function ProxyView({
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
   const lang = settings?.language || 'vi';
   const t = translations[lang] || translations.vi;
@@ -762,7 +763,8 @@ export default function ProxyView({
                             e.stopPropagation();
                             handleStartRename(item);
                           }}
-                          className="font-bold text-[13px] text-white hover:text-emerald-400 transition-colors truncate cursor-pointer"
+                          className="font-bold text-[13px] hover:text-emerald-500 transition-colors truncate cursor-pointer"
+                          style={{ color: currentThemeConfig.text }}
                           title="Bấm để đổi tên profile VPN"
                         >
                           {item.name}
@@ -773,36 +775,48 @@ export default function ProxyView({
                             e.stopPropagation();
                             handleStartRename(item);
                           }}
-                          className="p-1 rounded text-slate-500 hover:text-emerald-400 hover:bg-slate-800 transition-colors flex-shrink-0"
+                          className="p-1 rounded text-slate-500 hover:text-emerald-500 transition-colors flex-shrink-0"
                           title="Đổi tên profile"
                         >
                           <Edit2 size={11} />
                         </button>
                         {isConnecting ? (
-                          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                          <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold border flex items-center gap-1 ${
+                            isLight 
+                              ? 'bg-amber-50 border-amber-300 text-amber-800' 
+                              : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                          }`}>
                             <Loader2 size={9} className="animate-spin" />
                             <span>ĐANG KẾT NỐI...</span>
                           </span>
                         ) : isConnected ? (
-                          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse flex-shrink-0" />
+                          <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono font-bold border flex items-center gap-1 ${
+                            isLight 
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-800' 
+                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                          }`}>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse flex-shrink-0" />
                             <span>ĐÃ KẾT NỐI</span>
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono text-slate-500 bg-slate-800/40 border border-slate-700/50">
+                          <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-mono border ${
+                            isLight 
+                              ? 'text-slate-600 bg-slate-100 border-slate-300 font-semibold' 
+                              : 'text-slate-500 bg-slate-800/40 border-slate-700/50'
+                          }`}>
                             CHƯA KẾT NỐI
                           </span>
                         )}
                       </div>
-                      <div className="text-[11px] font-mono text-slate-400 mt-0.5 truncate">
-                        IP: <span className="text-sky-400">{item.assignedIp || item.interfaceIp || 'Auto'}</span>
-                        <span className="text-slate-600 mx-1.5">•</span>
+                      <div className="text-[11px] font-mono text-slate-500 mt-0.5 truncate">
+                        IP: <span className={isLight ? 'text-sky-700 font-medium' : 'text-sky-400'}>{item.assignedIp || item.interfaceIp || 'Auto'}</span>
+                        <span className="text-slate-400 mx-1.5">•</span>
                         Trạng thái: <span className={
                           isConnected 
-                            ? 'text-emerald-400 font-semibold' 
+                            ? (isLight ? 'text-emerald-700 font-semibold' : 'text-emerald-400 font-semibold')
                             : isConnecting 
-                            ? 'text-amber-400 font-medium' 
-                            : (item.lastHandshake && item.lastHandshake !== 'Chưa kết nối' && !item.lastHandshake.includes('Vừa xong') ? 'text-rose-400 font-medium' : 'text-slate-400')
+                            ? (isLight ? 'text-amber-700 font-medium' : 'text-amber-400 font-medium')
+                            : (item.lastHandshake && item.lastHandshake !== 'Chưa kết nối' && !item.lastHandshake.includes('Vừa xong') ? 'text-rose-500 font-medium' : 'text-slate-500')
                         }>
                           {isConnected ? 'Đang hoạt động' : isConnecting ? 'Đang thiết lập...' : (item.lastHandshake || 'Chưa kết nối')}
                         </span>
@@ -825,8 +839,8 @@ export default function ProxyView({
                     <span
                       className={`text-[10px] px-2.5 py-0.5 rounded-md font-mono font-bold uppercase border ${
                         isWg 
-                          ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' 
-                          : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                          ? (isLight ? 'bg-cyan-50 border-cyan-300 text-cyan-800' : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400')
+                          : (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-500/15 border-amber-500/30 text-amber-400')
                       }`}
                     >
                       {isWg ? 'WireGuard' : 'OpenVPN'}
@@ -838,10 +852,14 @@ export default function ProxyView({
                             e.stopPropagation();
                             handleOpenAuthModal(item);
                           }}
-                          className="text-[10px] font-mono text-slate-400 hover:text-slate-200 flex items-center gap-1 px-1.5 py-0.5 rounded border border-slate-700/60 bg-slate-800/40 hover:bg-slate-800 transition-colors"
+                          className={`text-[10px] font-mono flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors ${
+                            isLight 
+                              ? 'text-slate-700 bg-slate-100 hover:bg-slate-200 border-slate-300' 
+                              : 'text-slate-400 hover:text-slate-200 border-slate-700/60 bg-slate-800/40 hover:bg-slate-800'
+                          }`}
                           title="Không cần tài khoản (Certificate only). Bấm để chỉnh sửa"
                         >
-                          <ShieldCheck size={10} className="text-slate-400" />
+                          <ShieldCheck size={10} className="text-slate-500" />
                           <span>Cert only (No Auth)</span>
                         </button>
                       ) : item.username ? (
@@ -850,7 +868,9 @@ export default function ProxyView({
                             e.stopPropagation();
                             handleOpenAuthModal(item);
                           }}
-                          className="text-[10px] font-mono text-emerald-400 truncate max-w-[130px] flex items-center gap-1 hover:underline"
+                          className={`text-[10px] font-mono truncate max-w-[130px] flex items-center gap-1 hover:underline ${
+                            isLight ? 'text-emerald-700 font-semibold' : 'text-emerald-400'
+                          }`}
                           title={`Tài khoản: ${item.username}. Bấm để chỉnh sửa`}
                         >
                           <User size={10} />
@@ -862,7 +882,11 @@ export default function ProxyView({
                             e.stopPropagation();
                             handleOpenAuthModal(item);
                           }}
-                          className="text-[10px] font-mono text-amber-400 hover:text-amber-300 flex items-center gap-1 px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 transition-colors"
+                          className={`text-[10px] font-mono flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors ${
+                            isLight 
+                              ? 'text-amber-800 bg-amber-50 border-amber-300 hover:bg-amber-100 font-semibold' 
+                              : 'text-amber-400 hover:text-amber-300 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20'
+                          }`}
                           title="Yêu cầu tài khoản & mật khẩu OpenVPN. Bấm để nhập thông tin hoặc đổi sang Không cần xác thực"
                         >
                           <KeyRound size={10} />
@@ -883,7 +907,7 @@ export default function ProxyView({
                 const latency = latencies[item.id] || item.latency;
                 return (
                   <div className="flex items-center gap-2 font-mono text-xs">
-                    <span className="text-slate-300 font-medium truncate max-w-[130px]" title={item.endpoint || item.host}>
+                    <span className="font-medium truncate max-w-[130px]" style={{ color: currentThemeConfig.text }} title={item.endpoint || item.host}>
                       {item.endpoint || item.host || '-'}
                     </span>
                     {item.endpoint && (
@@ -893,7 +917,11 @@ export default function ProxyView({
                           handleProbeEndpoint(item);
                         }}
                         title="Kiểm tra độ trễ (Ping Test)"
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-emerald-400 flex-shrink-0"
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] border flex-shrink-0 transition-colors ${
+                          isLight 
+                            ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-emerald-700 font-bold' 
+                            : 'bg-slate-800/80 hover:bg-slate-700 border-slate-700/60 text-emerald-400'
+                        }`}
                       >
                         <Radio size={9} className={isProbing ? 'animate-spin' : ''} />
                         <span>{latency || 'Ping'}</span>
@@ -929,15 +957,19 @@ export default function ProxyView({
                   <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9.5px] font-mono font-bold ${
                       isConnecting
-                        ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                        ? (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-500/15 border-amber-500/30 text-amber-400')
                         : isConnected
-                        ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                        : 'bg-slate-800/50 border-slate-700/40 text-slate-500'
+                        ? (isLight ? 'bg-emerald-50 border-emerald-300 text-emerald-800' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400')
+                        : (isLight ? 'bg-slate-100 border-slate-300 text-slate-600' : 'bg-slate-800/50 border-slate-700/40 text-slate-500')
                     }`}>
                       {isConnecting ? (
-                        <Loader2 size={10} className="animate-spin text-amber-400" />
+                        <Loader2 size={10} className="animate-spin text-amber-500" />
                       ) : (
-                        <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-slate-500'}`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          isConnected 
+                            ? (isLight ? 'bg-emerald-600' : 'bg-emerald-400') 
+                            : (isLight ? 'bg-slate-400' : 'bg-slate-500')
+                        }`} />
                       )}
                       <span>{isConnecting ? 'CONNECTING...' : isConnected ? 'ON' : 'OFF'}</span>
                     </span>
@@ -956,7 +988,7 @@ export default function ProxyView({
                         }
                         className={
                           item.requiresAuth === false || item.authType === 'none'
-                            ? 'text-slate-400 border-slate-700 hover:text-white'
+                            ? (isLight ? 'text-slate-700 border-slate-300 hover:bg-slate-100 hover:text-slate-900' : 'text-slate-400 border-slate-700 hover:text-white')
                             : item.username
                             ? 'hover:border-emerald-500/40 hover:text-emerald-400'
                             : 'text-amber-400 border-amber-500/30'
@@ -1062,8 +1094,8 @@ export default function ProxyView({
                         <div className="flex items-center gap-1.5 mt-0.5">
                           <span className={`text-[9.5px] px-1.5 py-0.2 rounded font-mono font-bold uppercase border ${
                             isWg 
-                              ? 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400' 
-                              : 'bg-amber-500/15 border-amber-500/30 text-amber-400'
+                              ? (isLight ? 'bg-cyan-50 border-cyan-300 text-cyan-800' : 'bg-cyan-500/15 border-cyan-500/30 text-cyan-400') 
+                              : (isLight ? 'bg-amber-50 border-amber-300 text-amber-800' : 'bg-amber-500/15 border-amber-500/30 text-amber-400')
                           }`}>
                             {isWg ? 'WireGuard' : 'OpenVPN'}
                           </span>
@@ -1096,16 +1128,16 @@ export default function ProxyView({
                   <div className="p-2.5 rounded-lg border font-mono text-[11px] space-y-1.5" style={{ backgroundColor: currentThemeConfig.innerInput, borderColor: currentThemeConfig.border }}>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">Endpoint:</span>
-                      <span className="text-slate-300 font-semibold">{item.endpoint}</span>
+                      <span className="font-semibold" style={{ color: currentThemeConfig.text }}>{item.endpoint}</span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-slate-500">Subnets:</span>
-                      <span className="text-slate-400 truncate max-w-[140px]">{item.allowedIps}</span>
+                      <span className="text-slate-500 truncate max-w-[140px]">{item.allowedIps}</span>
                     </div>
                     {!isWg && (
-                      <div className="flex justify-between items-center pt-1 border-t border-slate-800">
+                      <div className="flex justify-between items-center pt-1 border-t" style={{ borderColor: currentThemeConfig.border }}>
                         <span className="text-slate-500">Xác thực:</span>
-                        <span className="text-slate-300 font-medium">
+                        <span className="font-medium" style={{ color: currentThemeConfig.text }}>
                           {item.requiresAuth === false || item.authType === 'none'
                             ? 'Cert only (No Auth)'
                             : item.username

@@ -707,6 +707,7 @@ export default function ManageServicesView({
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
 
   const [categories, setCategories] = useState([]);
@@ -1033,11 +1034,11 @@ export default function ManageServicesView({
                   {grp.id !== 'ALL' && isActive && <Check size={11} className="stroke-[3]" />}
                   <span>{grp.name}</span>
                   <span
-                    className="text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold"
-                    style={{
-                      backgroundColor: isActive ? `${accentColor}40` : `${currentThemeConfig.border}`,
-                      color: isActive ? '#fff' : currentThemeConfig.textMuted
-                    }}
+                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-semibold border ${
+                      isActive
+                        ? (isLight ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-500/40 text-white border-emerald-500/50')
+                        : (isLight ? 'bg-slate-200/90 text-slate-600 border-slate-300/60' : 'bg-slate-800/80 text-slate-400 border-slate-700/60')
+                    }`}
                   >
                     {grp.count}
                   </span>
@@ -1196,8 +1197,8 @@ export default function ManageServicesView({
                     <span 
                       className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${
                         svc.isWsl 
-                          ? 'text-sky-400 bg-sky-950/40 border-sky-800/40' 
-                          : 'text-amber-400 bg-amber-950/40 border-amber-800/40'
+                          ? (isLight ? 'text-sky-800 bg-sky-50 border-sky-300 font-semibold' : 'text-sky-400 bg-sky-950/40 border-sky-800/40') 
+                          : (isLight ? 'text-amber-800 bg-amber-50 border-amber-300 font-semibold' : 'text-amber-400 bg-amber-950/40 border-amber-800/40')
                       }`}
                     >
                       {svc.isWsl ? `🐧 WSL (${svc.wslDistro || 'Ubuntu'})` : '🪟 Windows'}
@@ -1214,19 +1215,27 @@ export default function ManageServicesView({
               <div className="flex items-center space-x-2 self-end md:self-center flex-shrink-0">
                 <button
                   onClick={() => setModalService(svc)}
-                  className="p-2 rounded-xl text-xs transition-all border hover:text-white"
-                  style={{
+                  className={`p-2 rounded-xl text-xs transition-all border ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900' 
+                      : 'hover:text-white'
+                  }`}
+                  style={!isLight ? {
                     backgroundColor: currentThemeConfig.innerInput,
                     borderColor: currentThemeConfig.border,
                     color: currentThemeConfig.textMuted
-                  }}
+                  } : {}}
                   title="Chỉnh sửa service"
                 >
                   <Edit3 size={14} />
                 </button>
                 <button
                   onClick={() => handleDelete(svc.id, svc.name)}
-                  className="p-2 bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs transition-all border border-rose-800/40"
+                  className={`p-2 rounded-xl text-xs transition-all border active:scale-95 ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-rose-50 border-slate-300 hover:border-rose-300 text-slate-400 hover:text-rose-600'
+                      : 'bg-slate-800/40 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border-slate-700/50 hover:border-rose-800/50'
+                  }`}
                   title="Xóa service"
                 >
                   <Trash2 size={14} />
@@ -1277,8 +1286,8 @@ export default function ManageServicesView({
                   <span 
                     className={`text-[9.5px] font-mono px-2 py-0.5 rounded-md border ${
                       svc.isWsl 
-                        ? 'text-sky-400 bg-sky-950/40 border-sky-800/40' 
-                        : 'text-amber-400 bg-amber-950/40 border-amber-800/40'
+                        ? (isLight ? 'text-sky-800 bg-sky-50 border-sky-300 font-semibold' : 'text-sky-400 bg-sky-950/40 border-sky-800/40') 
+                        : (isLight ? 'text-amber-800 bg-amber-50 border-amber-300 font-semibold' : 'text-amber-400 bg-amber-950/40 border-amber-800/40')
                     }`}
                   >
                     {svc.isWsl ? '🐧 WSL' : '🪟 Win'}
@@ -1293,10 +1302,23 @@ export default function ManageServicesView({
                 className="pt-3 border-t flex items-center justify-end space-x-2"
                 style={{ borderColor: currentThemeConfig.border }}
               >
-                <button onClick={() => setModalService(svc)} className="p-1.5 hover:text-white" style={{ color: currentThemeConfig.textMuted }}>
+                <button 
+                  onClick={() => setModalService(svc)} 
+                  className={`p-1.5 rounded-lg transition-all ${
+                    isLight ? 'hover:bg-slate-200 text-slate-600 hover:text-slate-900' : 'hover:text-white'
+                  }`} 
+                  style={!isLight ? { color: currentThemeConfig.textMuted } : {}}
+                  title="Chỉnh sửa service"
+                >
                   <Edit3 size={14} />
                 </button>
-                <button onClick={() => handleDelete(svc.id, svc.name)} className="p-1.5 text-slate-400 hover:text-rose-400">
+                <button 
+                  onClick={() => handleDelete(svc.id, svc.name)} 
+                  className={`p-1.5 rounded-lg transition-all ${
+                    isLight ? 'text-rose-500 hover:bg-rose-50 hover:text-rose-700' : 'text-slate-400 hover:text-rose-400'
+                  }`}
+                  title="Xóa service"
+                >
                   <Trash2 size={14} />
                 </button>
               </div>

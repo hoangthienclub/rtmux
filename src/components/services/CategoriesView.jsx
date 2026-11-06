@@ -339,7 +339,11 @@ function AssignServicesModal({ category, services = [], isOpen, onClose, onSave,
               <button
                 type="button"
                 onClick={() => setSelectedIds([])}
-                className="px-2.5 py-1 rounded-lg bg-rose-950/40 text-rose-300 hover:bg-rose-600 hover:text-white border border-rose-800/40 transition-all font-semibold"
+                className={`px-2.5 py-1 rounded-lg border transition-all font-semibold ${
+                  currentThemeConfig?.isLight
+                    ? 'bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 border-slate-300 hover:border-rose-300'
+                    : 'bg-rose-950/40 text-rose-300 hover:bg-rose-600 hover:text-white border-rose-800/40'
+                }`}
               >
                 Bỏ chọn
               </button>
@@ -464,6 +468,7 @@ function AssignServicesModal({ category, services = [], isOpen, onClose, onSave,
 // ================= MAIN CATEGORIES VIEW =================
 export default function CategoriesView({ services = [], onReloadServices, settings = {} }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
 
   const [categories, setCategories] = useState([]);
@@ -821,12 +826,16 @@ export default function CategoriesView({ services = [], onReloadServices, settin
                 <div className="flex items-center space-x-2 self-end md:self-center flex-shrink-0">
                   <button
                     onClick={() => setAssignModalCategory(cat)}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center space-x-1"
-                    style={{
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center space-x-1 ${
+                      isLight
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100'
+                        : ''
+                    }`}
+                    style={!isLight ? {
                       backgroundColor: `${accentColor}15`,
                       borderColor: `${accentColor}30`,
                       color: accentColor
-                    }}
+                    } : {}}
                     title="Gán thêm hoặc bớt microservices trong danh mục này"
                   >
                     <Boxes size={13} />
@@ -835,12 +844,16 @@ export default function CategoriesView({ services = [], onReloadServices, settin
 
                   <button
                     onClick={() => setModalCategory(cat)}
-                    className="p-1.5 rounded-xl text-xs transition-all border hover:text-white"
-                    style={{
+                    className={`p-1.5 rounded-xl text-xs transition-all border ${
+                      isLight 
+                        ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900' 
+                        : 'hover:text-white'
+                    }`}
+                    style={!isLight ? {
                       backgroundColor: currentThemeConfig.innerInput,
                       borderColor: currentThemeConfig.border,
                       color: currentThemeConfig.textMuted
-                    }}
+                    } : {}}
                     title="Chỉnh sửa danh mục"
                   >
                     <Edit3 size={14} />
@@ -848,7 +861,11 @@ export default function CategoriesView({ services = [], onReloadServices, settin
 
                   <button
                     onClick={() => handleDeleteCategory(cat.id, cat.name)}
-                    className="p-1.5 bg-rose-950/40 hover:bg-rose-600 text-rose-300 hover:text-white rounded-xl text-xs transition-all border border-rose-800/40"
+                    className={`p-1.5 rounded-xl text-xs transition-all border active:scale-95 ${
+                      isLight
+                        ? 'bg-slate-100 hover:bg-rose-50 border-slate-300 hover:border-rose-300 text-slate-400 hover:text-rose-600'
+                        : 'bg-slate-800/40 hover:bg-rose-950/40 text-slate-400 hover:text-rose-400 border-slate-700/50 hover:border-rose-800/50'
+                    }`}
                     title="Xóa danh mục này"
                   >
                     <Trash2 size={14} />
@@ -901,14 +918,20 @@ export default function CategoriesView({ services = [], onReloadServices, settin
                   <div className="flex items-center space-x-1">
                     <button 
                       onClick={() => setModalCategory(cat)} 
-                      className="p-1 hover:text-white"
-                      style={{ color: currentThemeConfig.textMuted }}
+                      className={`p-1 rounded-lg transition-colors ${
+                        isLight ? 'hover:bg-slate-200 text-slate-600 hover:text-slate-900' : 'hover:text-white'
+                      }`}
+                      style={!isLight ? { color: currentThemeConfig.textMuted } : {}}
+                      title="Chỉnh sửa danh mục"
                     >
                       <Edit3 size={14} />
                     </button>
                     <button 
                       onClick={() => handleDeleteCategory(cat.id, cat.name)} 
-                      className="p-1 text-slate-400 hover:text-rose-400"
+                      className={`p-1 rounded-lg transition-colors ${
+                        isLight ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50' : 'text-slate-400 hover:text-rose-400'
+                      }`}
+                      title="Xóa danh mục này"
                     >
                       <Trash2 size={14} />
                     </button>

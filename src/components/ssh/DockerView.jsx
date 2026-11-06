@@ -62,6 +62,7 @@ export default function DockerView({
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
   const lang = settings?.language || 'vi';
   const t = translations[lang] || translations.vi;
@@ -620,7 +621,17 @@ export default function DockerView({
               >
                 <span>{tab.label}</span>
                 {tab.count !== undefined && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-black/40">
+                  <span 
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full font-bold transition-all border ${
+                      isTabActive
+                        ? (isLight 
+                            ? 'bg-emerald-600/15 text-emerald-800 border-emerald-500/30' 
+                            : 'bg-white/20 text-white border-white/20')
+                        : (isLight 
+                            ? 'bg-slate-200/90 text-slate-600 border-slate-300/60' 
+                            : 'bg-slate-800/80 text-slate-400 border-slate-700/60')
+                    }`}
+                  >
                     {tab.count}
                   </span>
                 )}

@@ -876,7 +876,11 @@ function ProfilesManagerPane({
                     {key !== 'default' && (
                       <button
                         onClick={() => onDeleteProfile(key)}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition-all"
+                        className={`p-1.5 rounded-lg transition-all ${
+                          currentThemeConfig?.isLight
+                            ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                            : 'text-slate-500 hover:text-rose-400 hover:bg-rose-950/30'
+                        }`}
                         title="Xóa Profile này"
                       >
                         <Trash2 size={13} />
@@ -906,6 +910,7 @@ export default function EnvSetupView({
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
 
   const [activeTab, setActiveTab] = useState(
@@ -1689,7 +1694,11 @@ export default function EnvSetupView({
               {activeGlobalProfile !== 'default' && (
                 <button
                   onClick={() => handleDeleteProfileClick(activeGlobalProfile)}
-                  className="px-2.5 py-1.5 bg-rose-950/30 hover:bg-rose-600 text-rose-400 hover:text-white text-xs font-semibold rounded-xl border border-rose-800/40 transition-all flex items-center space-x-1"
+                  className={`px-2.5 py-1.5 text-xs font-semibold rounded-xl border transition-all flex items-center space-x-1 ${
+                    isLight
+                      ? 'bg-slate-100 hover:bg-rose-50 border-slate-300 hover:border-rose-300 text-slate-500 hover:text-rose-600'
+                      : 'bg-rose-950/30 hover:bg-rose-600 text-rose-400 hover:text-white border-rose-800/40'
+                  }`}
                 >
                   <Trash2 size={13} />
                   <span>Xóa Profile</span>

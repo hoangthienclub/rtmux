@@ -583,10 +583,21 @@ export default function App() {
     const themeCfg = THEME_CONFIGS[theme] || THEME_CONFIGS.zinc;
 
     document.documentElement.setAttribute('data-theme', theme);
+    if (themeCfg.isLight) {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    } else {
+      document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
+    }
     document.documentElement.style.setProperty('--app-accent', accent);
     document.documentElement.style.setProperty('--app-bg', themeCfg.bg);
+    document.documentElement.style.setProperty('--app-sub-bg', themeCfg.subBg);
     document.documentElement.style.setProperty('--app-surface', themeCfg.card);
     document.documentElement.style.setProperty('--app-border', themeCfg.border);
+    document.documentElement.style.setProperty('--app-text', themeCfg.text);
+    document.documentElement.style.setProperty('--app-text-muted', themeCfg.textMuted);
+    document.documentElement.style.setProperty('--app-inner-input', themeCfg.innerInput);
     document.body.style.backgroundColor = themeCfg.bg;
     document.body.style.color = themeCfg.text;
 
@@ -1203,7 +1214,9 @@ export default function App() {
     return matchesTag && matchesSearch;
   });
 
-  const hostColumns = useMemo(() => [
+  const hostColumns = useMemo(() => {
+    const isLight = !!currentThemeConfig?.isLight;
+    return [
     {
       key: 'os',
       label: 'OS',
@@ -1213,15 +1226,22 @@ export default function App() {
         const isWin = m.os === 'windows';
         const isWsl = m.os === 'wsl';
         const isOnline = m.cpu > 0 || (m.uptime && !m.uptime.includes('Click'));
+        
+        const badgeClass = isLight
+          ? isWin
+            ? 'bg-sky-50 border-sky-300 text-sky-800'
+            : isWsl
+            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+            : 'bg-blue-50 border-blue-300 text-blue-800'
+          : isWin
+            ? 'bg-[#0284c7]/15 border-[#0284c7]/40 text-[#38bdf8]'
+            : isWsl
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
+            : 'bg-sky-500/15 border-sky-500/30 text-sky-400';
+
         return (
-          <div className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-[10.5px] font-bold tracking-wide transition-all ${
-            isWin
-              ? 'bg-[#0284c7]/15 border-[#0284c7]/40 text-[#38bdf8]'
-              : isWsl
-              ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-              : 'bg-sky-500/15 border-sky-500/30 text-sky-400'
-          }`}>
-            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : 'bg-slate-500'}`} />
+          <div className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg border font-mono text-[10.5px] font-bold tracking-wide transition-all ${badgeClass}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse' : (isLight ? 'bg-slate-400' : 'bg-slate-500')}`} />
             <span>{isWin ? 'WIN' : isWsl ? 'WSL' : 'SSH'}</span>
           </div>
         );
@@ -1231,18 +1251,33 @@ export default function App() {
       key: 'name',
       label: 'TÊN MÁY CHỦ',
       render: (m) => {
-        const tagColor = 
-          m.tag === 'Production' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
-          m.tag === 'UAT' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
-          m.tag === 'Dev' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
-          'bg-slate-800/60 text-slate-300 border-slate-700/50';
+        const tagColor = isLight
+          ? m.tag === 'Production' ? 'bg-rose-50 text-rose-700 border-rose-300' :
+            m.tag === 'UAT' ? 'bg-amber-50 text-amber-800 border-amber-300' :
+            m.tag === 'Dev' ? 'bg-sky-50 text-sky-700 border-sky-300' :
+            'bg-slate-100 text-slate-700 border-slate-300'
+          : m.tag === 'Production' ? 'bg-rose-500/15 text-rose-400 border-rose-500/30' :
+            m.tag === 'UAT' ? 'bg-amber-500/15 text-amber-400 border-amber-500/30' :
+            m.tag === 'Dev' ? 'bg-sky-500/15 text-sky-400 border-sky-500/30' :
+            'bg-slate-800/60 text-slate-300 border-slate-700/50';
+
         return (
           <div className="flex items-center gap-2.5 py-0.5">
-            <span className="w-7 h-7 rounded-lg bg-slate-800/60 border border-slate-700/40 flex items-center justify-center text-slate-400 group-hover:text-emerald-400 group-hover:border-emerald-500/40 transition-all flex-shrink-0">
+            <span 
+              className="w-7 h-7 rounded-lg border flex items-center justify-center transition-all flex-shrink-0"
+              style={{
+                backgroundColor: currentThemeConfig.innerInput,
+                borderColor: currentThemeConfig.border,
+                color: currentThemeConfig.textMuted
+              }}
+            >
               <Server size={13} />
             </span>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="font-bold text-[13px] text-white group-hover:text-emerald-400 transition-colors truncate">
+              <span 
+                className="font-bold text-[13px] transition-colors truncate"
+                style={{ color: currentThemeConfig.text }}
+              >
                 {m.name}
               </span>
               {m.tag && (
@@ -1261,11 +1296,17 @@ export default function App() {
       render: (m) => {
         const raw = m.host || `${m.user || 'root'}@${m.hostname || m.name}:${m.port || 22}`;
         return (
-          <div className="flex items-center gap-2 font-mono text-xs text-slate-400">
-            <span className="text-slate-600 group-hover:text-sky-400 transition-colors flex-shrink-0">
+          <div 
+            className="flex items-center gap-2 font-mono text-xs transition-colors"
+            style={{ color: currentThemeConfig.textMuted }}
+          >
+            <span className="opacity-70 group-hover:text-sky-500 transition-colors flex-shrink-0">
               <Terminal size={12} />
             </span>
-            <span className="group-hover:text-slate-200 transition-colors truncate">
+            <span 
+              className="group-hover:opacity-100 transition-colors truncate"
+              style={{ color: isLight ? '#334155' : undefined }}
+            >
               {raw}
             </span>
           </div>
@@ -1283,26 +1324,30 @@ export default function App() {
             label="SSH"
             variant="primary"
             accentColor={accentColor}
+            themeConfig={currentThemeConfig}
             onClick={() => handleConnectMachine(m)}
             title="Kết nối SSH Terminal"
           />
           <TableActionButton
             icon={FolderSync}
             label="SFTP"
+            themeConfig={currentThemeConfig}
             onClick={() => handleOpenSftpFromCard(m)}
             title="Duyệt file SFTP"
-            className="hover:border-sky-500/40 hover:text-sky-400"
+            className="hover:border-sky-500/40 hover:text-sky-500"
           />
           <TableActionButton
             icon={Box}
             label="Docker"
+            themeConfig={currentThemeConfig}
             onClick={() => handleOpenDockerFromCard(m)}
             title="Quản lý Docker Containers"
-            className="hover:border-purple-500/40 hover:text-purple-400"
+            className="hover:border-purple-500/40 hover:text-purple-500"
           />
           <TableActionButton
             icon={Settings2}
             variant="ghost"
+            themeConfig={currentThemeConfig}
             onClick={() => {
               setEditingMachine(m);
               setIsAddModalOpen(true);
@@ -1314,6 +1359,7 @@ export default function App() {
             <TableActionButton
               icon={Trash2}
               variant="danger"
+              themeConfig={currentThemeConfig}
               onClick={() => handleRequestDeleteMachine(m.id)}
               title="Xóa máy chủ"
               className="w-7 h-7 !px-0"
@@ -1322,7 +1368,8 @@ export default function App() {
         </div>
       )
     }
-  ], [accentColor, currentThemeConfig]);
+  ];
+  }, [accentColor, currentThemeConfig]);
 
   return (
     <div
@@ -1453,9 +1500,12 @@ export default function App() {
           ) : currentNav === 'hosts' ? (
             /* RTMUX REMOTE HOSTS & TMUX DASHBOARD */
             <div className="flex-1 p-6 overflow-y-auto space-y-6">
-              <div className="flex items-center justify-between pb-3 border-b border-[#161e2e]">
+              <div 
+                className="flex items-center justify-between pb-3 border-b"
+                style={{ borderColor: currentThemeConfig.border }}
+              >
                 <div className="flex items-center gap-2">
-                  <Server size={18} className="text-emerald-400" />
+                  <Server size={18} style={{ color: accentColor }} />
                   <h2 className="text-sm font-bold uppercase tracking-wider" style={{ color: currentThemeConfig.text }}>
                     {t.hostsTerminalTitle || 'Máy Chủ & Terminal (SSH / WSL)'} ({filteredMachines.length})
                   </h2>
@@ -1554,8 +1604,8 @@ export default function App() {
                       <div className="flex items-center gap-3">
                         <span>Tổng: <strong style={{ color: currentThemeConfig.text }}>{filteredMachines.length}</strong> máy chủ</span>
                         <span>•</span>
-                        <span className="text-emerald-400 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className={`flex items-center gap-1.5 ${currentThemeConfig?.isLight ? 'text-emerald-700 font-bold' : 'text-emerald-400'}`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                           {filteredMachines.filter(m => (m.cpu > 0 || (m.uptime && !m.uptime.includes('Click')))).length} Hoạt động (Online)
                         </span>
                         <span>•</span>

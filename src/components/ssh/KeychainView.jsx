@@ -30,6 +30,7 @@ export default function KeychainView({
   settings
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
   const [copiedId, setCopiedId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,13 +96,26 @@ export default function KeychainView({
   );
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto space-y-5 custom-scroll bg-[#070b14]">
+    <div 
+      className="flex-1 p-6 overflow-y-auto space-y-5 custom-scroll"
+      style={{ backgroundColor: currentThemeConfig.bg }}
+    >
       {/* Top Source Banner */}
-      <div className="flex items-center justify-between p-3 rounded-xl bg-[#09121d] border border-[#142338] text-xs">
-        <div className="flex items-center gap-2 text-slate-300">
-          <FolderOpen size={15} className="text-emerald-400 flex-shrink-0" />
+      <div 
+        className="flex items-center justify-between p-3 rounded-xl border text-xs"
+        style={{ 
+          backgroundColor: currentThemeConfig.card, 
+          borderColor: currentThemeConfig.border 
+        }}
+      >
+        <div className={`flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+          <FolderOpen size={15} className="text-emerald-500 flex-shrink-0" />
           <span>Thư mục SSH mặc định:</span>
-          <span className="font-mono text-emerald-400 font-semibold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/40">
+          <span className={`font-mono font-semibold px-2 py-0.5 rounded border ${
+            isLight 
+              ? 'text-emerald-800 bg-emerald-50 border-emerald-300' 
+              : 'text-emerald-400 bg-emerald-950/60 border-emerald-800/40'
+          }`}>
             {sshDirs[0] || '~/.ssh'}
           </span>
           <span className="text-slate-500 hidden md:inline">({keys.length} keys tự động nhận diện)</span>
@@ -110,7 +124,11 @@ export default function KeychainView({
         <button
           onClick={handleTriggerRescan}
           disabled={isRescanning}
-          className="flex items-center gap-1.5 px-2.5 py-1 bg-[#101c2e] hover:bg-[#182a44] border border-[#1f3554] text-sky-300 hover:text-white rounded-lg text-xs font-medium transition-all"
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
+            isLight 
+              ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-sky-700 hover:text-sky-900' 
+              : 'bg-[#101c2e] hover:bg-[#182a44] border border-[#1f3554] text-sky-300 hover:text-white'
+          }`}
           title="Đọc lại các khóa SSH từ thư mục ~/.ssh"
         >
           <RotateCw size={12} className={isRescanning ? 'animate-spin text-sky-400' : ''} />
@@ -119,26 +137,35 @@ export default function KeychainView({
       </div>
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#161e2e]">
+      <div 
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b"
+        style={{ borderColor: currentThemeConfig.border }}
+      >
         <div>
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 font-sans">
-            <KeyRound size={16} className="text-emerald-400" />
+          <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2 font-sans" style={{ color: currentThemeConfig.text }}>
+            <KeyRound size={16} className="text-emerald-500" />
             <span>Keychain (Kho Khóa & Chứng Chỉ SSH) ({keys.length})</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1 font-sans">
+          <p className="text-xs mt-1 font-sans" style={{ color: currentThemeConfig.textMuted }}>
             Tự động đọc và đồng bộ private/public keys từ thư mục OpenSSH mặc định của hệ thống.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
           {/* View Mode Toggle: List vs Grid */}
-          <div className="flex items-center p-0.5 rounded-xl border border-[#1a2438] bg-[#0c101c]">
+          <div 
+            className="flex items-center p-0.5 rounded-xl border"
+            style={{ 
+              backgroundColor: currentThemeConfig.innerInput, 
+              borderColor: currentThemeConfig.border 
+            }}
+          >
             <button
               onClick={() => handleSetViewMode('list')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'list'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-slate-400 hover:text-white'
+                  ? (isLight ? 'bg-emerald-600 text-white font-bold' : 'bg-emerald-500/20 text-emerald-400')
+                  : (isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white')
               }`}
               title="Dạng danh sách (List View)"
             >
@@ -148,8 +175,8 @@ export default function KeychainView({
               onClick={() => handleSetViewMode('grid')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'grid'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-slate-400 hover:text-white'
+                  ? (isLight ? 'bg-emerald-600 text-white font-bold' : 'bg-emerald-500/20 text-emerald-400')
+                  : (isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white')
               }`}
               title="Dạng thẻ lưới (Grid View)"
             >
@@ -164,7 +191,12 @@ export default function KeychainView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm SSH key..."
-              className="w-52 h-8 bg-[#0c101c] border border-[#1a2438] rounded-xl pl-8 pr-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
+              className="w-52 h-8 border rounded-xl pl-8 pr-3 text-xs placeholder-slate-500 font-mono focus:outline-none"
+              style={{
+                backgroundColor: currentThemeConfig.innerInput,
+                borderColor: currentThemeConfig.border,
+                color: currentThemeConfig.text
+              }}
             />
           </div>
           <button
@@ -179,13 +211,19 @@ export default function KeychainView({
 
       {/* Keys List */}
       {filteredKeys.length === 0 ? (
-        <div className="p-8 rounded-2xl bg-[#0a0e1a] border border-[#161e2e] text-center space-y-3">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-950/40 border border-emerald-800/40 text-emerald-400 flex items-center justify-center mx-auto">
+        <div 
+          className="p-8 rounded-2xl border text-center space-y-3"
+          style={{ 
+            backgroundColor: currentThemeConfig.card, 
+            borderColor: currentThemeConfig.border 
+          }}
+        >
+          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 flex items-center justify-center mx-auto">
             <KeyRound size={22} />
           </div>
-          <div className="text-sm font-semibold text-white">Chưa có khóa SSH nào được tìm thấy</div>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Thư mục <code className="text-emerald-400 font-mono">{sshDirs[0] || '%USERPROFILE%\\.ssh'}</code> hiện không chứa file private key nào (chỉ có config/known_hosts). Bạn có thể bấm nút &quot;Thêm Key Mới&quot; hoặc bật &quot;WSL Integration&quot; trong Cài Đặt nếu muốn nạp khóa từ WSL.
+          <div className="text-sm font-semibold" style={{ color: currentThemeConfig.text }}>Chưa có khóa SSH nào được tìm thấy</div>
+          <p className="text-xs max-w-md mx-auto" style={{ color: currentThemeConfig.textMuted }}>
+            Thư mục <code className="text-emerald-500 font-mono">{sshDirs[0] || '%USERPROFILE%\\.ssh'}</code> hiện không chứa file private key nào (chỉ có config/known_hosts). Bạn có thể bấm nút &quot;Thêm Key Mới&quot; hoặc bật &quot;WSL Integration&quot; trong Cài Đặt nếu muốn nạp khóa từ WSL.
           </p>
           <button
             onClick={() => setIsAddModalOpen(true)}
@@ -202,8 +240,8 @@ export default function KeychainView({
               key: 'name',
               label: 'TÊN KHÓA',
               render: (k) => (
-                <div className="font-bold text-white text-xs flex items-center gap-2">
-                  <ShieldCheck size={14} className="text-emerald-400" />
+                <div className="font-bold text-xs flex items-center gap-2" style={{ color: currentThemeConfig.text }}>
+                  <ShieldCheck size={14} className="text-emerald-500" />
                   <span>{k.name}</span>
                 </div>
               )
@@ -213,7 +251,11 @@ export default function KeychainView({
               label: 'LOẠI',
               width: 'w-28',
               render: (k) => (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                  isLight 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold' 
+                    : 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                }`}>
                   {k.keyType || k.type || 'ED25519'}
                 </span>
               )
@@ -221,13 +263,13 @@ export default function KeychainView({
             {
               key: 'fingerprint',
               label: 'FINGERPRINT',
-              className: 'font-mono text-slate-400 text-[11px] max-w-[200px] truncate',
+              className: `font-mono text-[11px] max-w-[200px] truncate ${isLight ? 'text-slate-600' : 'text-slate-400'}`,
               render: (k) => <span title={k.fingerprint}>{k.fingerprint}</span>
             },
             {
               key: 'path',
               label: 'ĐƯỜNG DẪN',
-              className: 'font-mono text-slate-500 text-[11px] hidden md:table-cell max-w-[180px] truncate',
+              className: `font-mono text-[11px] hidden md:table-cell max-w-[180px] truncate ${isLight ? 'text-slate-500' : 'text-slate-500'}`,
               render: (k) => <span title={k.path}>{k.path || '-'}</span>
             },
             {
@@ -235,7 +277,11 @@ export default function KeychainView({
               label: 'BẢO MẬT',
               className: 'hidden lg:table-cell',
               render: (k) => k.hasPassphrase ? (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/40 inline-flex items-center gap-1">
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-flex items-center gap-1 ${
+                  isLight 
+                    ? 'bg-amber-50 text-amber-800 border-amber-300 font-semibold' 
+                    : 'bg-amber-950/60 text-amber-400 border-amber-800/40'
+                }`}>
                   <Lock size={10} /> Passphrase
                 </span>
               ) : (
@@ -250,13 +296,17 @@ export default function KeychainView({
                 <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleCopy(k.id, k.publicKey)}
-                    className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0e1422] hover:bg-[#151f33] border border-[#1f2b42] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all"
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      isLight 
+                        ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900' 
+                        : 'bg-[#0e1422] hover:bg-[#151f33] border border-[#1f2b42] text-slate-300 hover:text-white'
+                    }`}
                     title="Sao chép Public Key"
                   >
                     {copiedId === k.id ? (
                       <>
-                        <Check size={12} className="text-emerald-400" />
-                        <span className="text-emerald-400 text-[11px]">Đã chép</span>
+                        <Check size={12} className="text-emerald-500" />
+                        <span className="text-emerald-600 text-[11px] font-semibold">Đã chép</span>
                       </>
                     ) : (
                       <>
@@ -293,20 +343,32 @@ export default function KeychainView({
           {filteredKeys.map((k) => (
             <div
               key={k.id}
-              className="p-4 rounded-xl bg-[#0a0e1a] border border-[#161e2e] hover:border-emerald-500/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+              className="p-4 rounded-xl border hover:border-emerald-500/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4"
+              style={{
+                backgroundColor: currentThemeConfig.card,
+                borderColor: currentThemeConfig.border
+              }}
             >
               <div className="flex items-start gap-3.5">
-                <div className="w-10 h-10 rounded-xl bg-emerald-950/50 border border-emerald-800/40 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 flex-shrink-0">
                   <ShieldCheck size={20} />
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2.5">
-                    <span className="font-bold text-sm text-white font-sans">{k.name}</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/40">
+                    <span className="font-bold text-sm font-sans" style={{ color: currentThemeConfig.text }}>{k.name}</span>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                      isLight 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold' 
+                        : 'bg-emerald-950/80 text-emerald-400 border-emerald-800/40'
+                    }`}>
                       {k.keyType || k.type || 'ED25519'}
                     </span>
                     {k.hasPassphrase && (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800/40 flex items-center gap-1">
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
+                        isLight 
+                          ? 'bg-amber-50 text-amber-800 border-amber-300 font-semibold' 
+                          : 'bg-amber-950/60 text-amber-400 border-amber-800/40'
+                      }`}>
                         <Lock size={10} /> Passphrase
                       </span>
                     )}
@@ -316,16 +378,20 @@ export default function KeychainView({
                       </span>
                     )}
                   </div>
-                  <div className="text-xs text-slate-400 font-mono">{k.fingerprint}</div>
+                  <div className={`text-xs font-mono ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{k.fingerprint}</div>
                   {k.associatedHosts && k.associatedHosts.length > 0 && (
                     <div className="flex items-center gap-2 pt-1">
                       <span className="text-[11px] text-slate-500 font-sans">Gán cho máy chủ:</span>
                       {k.associatedHosts.map((h, i) => (
                         <span
                           key={i}
-                          className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#131b2e] text-slate-300 border border-[#1f2c4a] flex items-center gap-1"
+                          className={`text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
+                            isLight
+                              ? 'bg-slate-100 text-slate-700 border-slate-300'
+                              : 'bg-[#131b2e] text-slate-300 border-[#1f2c4a]'
+                          }`}
                         >
-                          <Server size={9} className="text-sky-400" />
+                          <Server size={9} className="text-sky-500" />
                           {h}
                         </span>
                       ))}
@@ -337,13 +403,17 @@ export default function KeychainView({
               <div className="flex items-center gap-2 self-end md:self-center">
                 <button
                   onClick={() => handleCopy(k.id, k.publicKey)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0e1422] hover:bg-[#151f33] border border-[#1f2b42] text-slate-300 hover:text-white rounded-xl text-xs font-medium transition-all"
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 hover:text-slate-900' 
+                      : 'bg-[#0e1422] hover:bg-[#151f33] border border-[#1f2b42] text-slate-300 hover:text-white'
+                  }`}
                   title="Sao chép Public Key để dán vào authorized_keys"
                 >
                   {copiedId === k.id ? (
                     <>
-                      <Check size={13} className="text-emerald-400" />
-                      <span className="text-emerald-400">Đã chép</span>
+                      <Check size={13} className="text-emerald-500" />
+                      <span className="text-emerald-600 font-semibold">Đã chép</span>
                     </>
                   ) : (
                     <>
@@ -356,7 +426,11 @@ export default function KeychainView({
                 {onDeleteKey && (
                   <button
                     onClick={() => setKeyToDelete(k)}
-                    className="w-8 h-8 rounded-xl bg-red-950/30 text-red-400 hover:bg-red-900/50 border border-red-900/40 flex items-center justify-center transition-all"
+                    className={`w-8 h-8 rounded-xl border flex items-center justify-center transition-all ${
+                      isLight
+                        ? 'bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white border-rose-200'
+                        : 'bg-red-950/30 text-red-400 hover:bg-red-900/50 border-red-900/40'
+                    }`}
                     title="Xóa khóa khỏi app"
                   >
                     <Trash2 size={13} />
@@ -375,14 +449,19 @@ export default function KeychainView({
           onClick={() => setIsAddModalOpen(false)}
         >
           <div 
-            className="bg-[#121622] border border-[#1e2638] rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            className="rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 border"
+            style={{
+              backgroundColor: currentThemeConfig.card,
+              borderColor: currentThemeConfig.border
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-[#1c2436] mb-4">
-              <h3 className="font-bold text-base text-white font-sans">Thêm SSH Key Mới</h3>
+            <div className="flex items-center justify-between pb-3 border-b mb-4" style={{ borderColor: currentThemeConfig.border }}>
+              <h3 className="font-bold text-base font-sans" style={{ color: currentThemeConfig.text }}>Thêm SSH Key Mới</h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-[#1a2336]"
+                className="p-1 rounded-lg transition-colors hover:bg-slate-500/20"
+                style={{ color: currentThemeConfig.textMuted }}
               >
                 <X size={16} />
               </button>
@@ -390,11 +469,11 @@ export default function KeychainView({
 
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400">Chưa có khóa?</span>
+                <span className="text-xs" style={{ color: currentThemeConfig.textMuted }}>Chưa có khóa?</span>
                 <button
                   type="button"
                   onClick={handleAutoGenerateKey}
-                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/20 text-emerald-400 border border-emerald-500/40 rounded-lg text-xs font-medium hover:bg-emerald-600/30 transition-all"
+                  className="flex items-center gap-1 px-2.5 py-1 bg-emerald-600/20 text-emerald-500 border border-emerald-500/40 rounded-lg text-xs font-medium hover:bg-emerald-600/30 transition-all"
                 >
                   <Sparkles size={12} />
                   <span>Tự động sinh khóa ngẫu nhiên</span>
@@ -402,22 +481,32 @@ export default function KeychainView({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5 font-sans">Tên Key</label>
+                <label className="block text-xs font-medium mb-1.5 font-sans" style={{ color: currentThemeConfig.text }}>Tên Key</label>
                 <input
                   type="text"
                   placeholder="e.g. id_ed25519_deploy"
                   value={newKeyName}
                   onChange={(e) => setNewKeyName(e.target.value)}
-                  className="w-full h-10 bg-[#0c1018] border border-[#1e2638] rounded-xl px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"
+                  className="w-full h-10 border rounded-xl px-3 text-xs placeholder-slate-500 focus:outline-none font-mono"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.text
+                  }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5 font-sans">Loại Khóa</label>
+                <label className="block text-xs font-medium mb-1.5 font-sans" style={{ color: currentThemeConfig.text }}>Loại Khóa</label>
                 <select
                   value={newKeyType}
                   onChange={(e) => setNewKeyType(e.target.value)}
-                  className="w-full h-10 bg-[#0c1018] border border-[#1e2638] rounded-xl px-3 text-xs text-white focus:outline-none focus:border-emerald-500 font-sans"
+                  className="w-full h-10 border rounded-xl px-3 text-xs focus:outline-none font-sans"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.text
+                  }}
                 >
                   <option value="ED25519">ED25519 (Khuyên dùng - Nhanh & An toàn nhất)</option>
                   <option value="RSA 4096">RSA 4096-bit (Tương thích máy chủ cũ)</option>
@@ -426,7 +515,7 @@ export default function KeychainView({
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5 font-sans">
+                <label className="block text-xs font-medium mb-1.5 font-sans" style={{ color: currentThemeConfig.text }}>
                   Private Key (Dán nội dung khóa)
                 </label>
                 <textarea
@@ -434,15 +523,21 @@ export default function KeychainView({
                   onChange={(e) => setPrivateContent(e.target.value)}
                   placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
                   rows={4}
-                  className="w-full bg-[#0c1018] border border-[#1e2638] rounded-xl p-3 text-xs text-white placeholder-slate-600 font-mono focus:outline-none focus:border-emerald-500 resize-none"
+                  className="w-full border rounded-xl p-3 text-xs placeholder-slate-400 font-mono focus:outline-none resize-none"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.text
+                  }}
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-3 border-t border-[#1e2638]">
+              <div className="flex justify-end gap-2.5 pt-3 border-t" style={{ borderColor: currentThemeConfig.border }}>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl hover:bg-[#1a2336] transition-all font-sans"
+                  className="px-4 py-2 text-xs font-medium rounded-xl transition-all font-sans"
+                  style={{ color: currentThemeConfig.textMuted }}
                 >
                   Hủy
                 </button>

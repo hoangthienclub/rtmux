@@ -97,13 +97,21 @@ export default function ServiceCard({
         <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
           {/* Status Badge */}
           {isRunning ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-semibold border ${
+              currentThemeConfig.isLight 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            }`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
               Running {pid && `(PID: ${pid})`}
             </span>
           ) : isError ? (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-rose-400 mr-1.5"></span>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full font-semibold border ${
+              currentThemeConfig.isLight 
+                ? 'bg-rose-50 text-rose-800 border-rose-300' 
+                : 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+            }`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>
               Error
             </span>
           ) : (
@@ -115,7 +123,7 @@ export default function ServiceCard({
                 color: currentThemeConfig.textMuted || '#a1a1aa'
               }}
             >
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 mr-1.5"></span>
+              <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${currentThemeConfig.isLight ? 'bg-slate-400' : 'bg-slate-500'}`}></span>
               Stopped
             </span>
           )}

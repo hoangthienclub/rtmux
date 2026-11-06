@@ -127,7 +127,7 @@ function getLogLineStyle(text, type) {
 }
 
 // Helper: Status Badge component for Sidebar and Header
-function renderStatusBadge(statusInfo, size = 'md') {
+function renderStatusBadge(statusInfo, size = 'md', isLight = false) {
   const status = (statusInfo?.status || 'STOPPED').toUpperCase();
   const isRunning = status === 'RUNNING';
   const isError = status === 'ERROR';
@@ -136,31 +136,47 @@ function renderStatusBadge(statusInfo, size = 'md') {
 
   if (isRunning) {
     return (
-      <span className={`inline-flex items-center gap-1.5 font-mono font-bold rounded-full border bg-emerald-950/70 border-emerald-700/80 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)] ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      <span className={`inline-flex items-center gap-1.5 font-mono font-bold rounded-full border ${
+        isLight
+          ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
+          : 'bg-emerald-950/70 border-emerald-700/80 text-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
+      } ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-emerald-600' : 'bg-emerald-400'} animate-pulse`}></span>
         <span>RUNNING</span>
       </span>
     );
   }
   if (isError) {
     return (
-      <span className={`inline-flex items-center gap-1.5 font-mono font-bold rounded-full border bg-rose-950/70 border-rose-700/80 text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.35)] ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+      <span className={`inline-flex items-center gap-1.5 font-mono font-bold rounded-full border ${
+        isLight
+          ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-sm'
+          : 'bg-rose-950/70 border-rose-700/80 text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.35)]'
+      } ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-rose-600' : 'bg-rose-400'}`}></span>
         <span>ERROR</span>
       </span>
     );
   }
   if (isStarting || isStopping) {
     return (
-      <span className={`inline-flex items-center gap-1.5 font-mono font-bold rounded-full border bg-amber-950/70 border-amber-700/80 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)] ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+      <span className={`inline-flex items-center gap-1.5 font-mono font-bold rounded-full border ${
+        isLight
+          ? 'bg-amber-50 border-amber-300 text-amber-800 shadow-sm'
+          : 'bg-amber-950/70 border-amber-700/80 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.25)]'
+      } ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-amber-600' : 'bg-amber-400'} animate-ping`}></span>
         <span>{isStarting ? 'STARTING...' : 'STOPPING...'}</span>
       </span>
     );
   }
   return (
-    <span className={`inline-flex items-center gap-1.5 font-mono font-medium rounded-full border bg-slate-800/60 border-slate-700/60 text-slate-400 ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
+    <span className={`inline-flex items-center gap-1.5 font-mono font-medium rounded-full border ${
+      isLight
+        ? 'bg-slate-100 border-slate-300 text-slate-600'
+        : 'bg-slate-800/60 border-slate-700/60 text-slate-400'
+    } ${size === 'sm' ? 'text-[9.5px] px-2 py-0.5' : 'text-[10.5px] px-2.5 py-0.5'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${isLight ? 'bg-slate-400' : 'bg-slate-500'}`}></span>
       <span>STOPPED</span>
     </span>
   );
@@ -189,6 +205,7 @@ export default function ServiceMonitorView({
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
   const lang = settings?.language || 'vi';
   const t = translations?.[lang] || translations?.vi || {};
@@ -796,7 +813,7 @@ export default function ServiceMonitorView({
                       >
                         {svc.name}
                       </span>
-                      {renderStatusBadge(svc.statusInfo, 'sm')}
+                      {renderStatusBadge(svc.statusInfo, 'sm', isLight)}
                     </div>
 
                     <div className="flex items-center justify-between text-xs font-mono">
@@ -856,7 +873,7 @@ export default function ServiceMonitorView({
                   {selectedService.name}
                 </h2>
                 
-                {renderStatusBadge(selectedService.statusInfo, 'md')}
+                {renderStatusBadge(selectedService.statusInfo, 'md', isLight)}
 
                 <span 
                   className="font-mono text-xs px-2.5 py-0.5 rounded-lg border font-semibold"
@@ -932,7 +949,11 @@ export default function ServiceMonitorView({
                 {/* Kill Port */}
                 <button
                   onClick={() => onKillPort && onKillPort(selectedService.id)}
-                  className="flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-medium border transition-all active:scale-95 bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25 cursor-pointer"
+                  className={`flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-semibold border transition-all active:scale-95 cursor-pointer ${
+                    isLight 
+                      ? 'bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100' 
+                      : 'bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25'
+                  }`}
                   title={`Giải phóng cổng mạng của ${selectedService.name} (Port ${selectedService.port})`}
                 >
                   <Zap size={12} />
@@ -956,26 +977,26 @@ export default function ServiceMonitorView({
               </div>
             </div>
 
-            {/* Live Console Window (Strictly capped at 200 lines) */}
+            {/* Live Console Window (Terminal screen always stays crisp dark for 100% ANSI readability) */}
             <div 
               className="flex-1 flex flex-col border rounded-xl overflow-hidden min-h-[380px]"
               style={{
-                backgroundColor: currentThemeConfig.innerInput,
-                borderColor: currentThemeConfig.border
+                backgroundColor: isLight ? '#0a0f1d' : currentThemeConfig.innerInput,
+                borderColor: isLight ? '#cbd5e1' : currentThemeConfig.border
               }}
             >
               {/* Console Header Bar */}
               <div 
                 className="h-9 px-3 border-b flex items-center justify-between flex-shrink-0"
                 style={{
-                  backgroundColor: currentThemeConfig.card,
-                  borderColor: currentThemeConfig.border
+                  backgroundColor: isLight ? '#0f172a' : currentThemeConfig.card,
+                  borderColor: isLight ? '#1e293b' : currentThemeConfig.border
                 }}
               >
                 <div className="flex items-center gap-2">
                   <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 shadow-[0_0_6px_#10b981]' : 'bg-slate-500'}`}></span>
-                  <span className="font-mono text-xs font-medium" style={{ color: currentThemeConfig.text }}>
-                    Console: {selectedService.name} <span style={{ color: currentThemeConfig.textMuted }}>({rawLogs.length}/200 lines)</span>
+                  <span className="font-mono text-xs font-medium" style={{ color: isLight ? '#f1f5f9' : currentThemeConfig.text }}>
+                    Console: {selectedService.name} <span style={{ color: isLight ? '#94a3b8' : currentThemeConfig.textMuted }}>({rawLogs.length}/200 lines)</span>
                   </span>
                 </div>
 
@@ -988,9 +1009,9 @@ export default function ServiceMonitorView({
                       placeholder="Filter logs..."
                       className="w-44 h-6 border rounded-md px-2 text-[11px] placeholder-slate-500 focus:outline-none font-mono"
                       style={{
-                        backgroundColor: currentThemeConfig.innerInput,
-                        borderColor: currentThemeConfig.border,
-                        color: currentThemeConfig.text
+                        backgroundColor: isLight ? '#1e293b' : currentThemeConfig.innerInput,
+                        borderColor: isLight ? '#334155' : currentThemeConfig.border,
+                        color: isLight ? '#f8fafc' : currentThemeConfig.text
                       }}
                     />
                   </div>
@@ -1009,7 +1030,7 @@ export default function ServiceMonitorView({
               <div
                 ref={logContainerRef}
                 className="flex-1 p-4 font-mono text-[12.5px] leading-relaxed overflow-y-auto select-text scroll-smooth max-h-[500px]"
-                style={{ backgroundColor: currentThemeConfig.innerInput }}
+                style={{ backgroundColor: '#070b14' }}
               >
                 {filteredLogs.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center py-16 space-y-2 select-none" style={{ color: currentThemeConfig.textMuted }}>

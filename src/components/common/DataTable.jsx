@@ -21,11 +21,12 @@ export default function DataTable({
   containerClassName = '',
   rowClassName = ''
 }) {
-  const cardBg = themeConfig?.card || '#0e131f';
-  const borderColor = themeConfig?.border || '#1e293b';
-  const headerBg = themeConfig?.innerInput || '#080c14';
-  const textMuted = themeConfig?.textMuted || '#64748b';
-  const textColor = themeConfig?.text || '#f8fafc';
+  const isLight = !!themeConfig?.isLight || (typeof document !== 'undefined' && document.documentElement.classList.contains('light'));
+  const cardBg = themeConfig?.card || (isLight ? '#ffffff' : '#0e131f');
+  const borderColor = themeConfig?.border || (isLight ? '#cbd5e1' : '#1e293b');
+  const headerBg = themeConfig?.innerInput || (isLight ? '#f8fafc' : '#080c14');
+  const textMuted = themeConfig?.textMuted || (isLight ? '#64748b' : '#64748b');
+  const textColor = themeConfig?.text || (isLight ? '#0f172a' : '#f8fafc');
 
   const getKey = (item, index) => {
     if (typeof keyField === 'function') return keyField(item, index);
@@ -50,7 +51,7 @@ export default function DataTable({
               style={{
                 backgroundColor: headerBg,
                 borderColor: borderColor,
-                color: textMuted
+                color: isLight ? '#334155' : textMuted
               }}
             >
               {columns.map((col, idx) => {
@@ -95,7 +96,7 @@ export default function DataTable({
                     key={rowKey}
                     onClick={(e) => onRowClick && onRowClick(item, index, e)}
                     onDoubleClick={(e) => onRowDoubleClick && onRowDoubleClick(item, index, e)}
-                    className={`hover:bg-white/[0.035] active:bg-white/[0.06] transition-colors duration-150 cursor-pointer group select-none ${extraRowClass}`}
+                    className={`${isLight ? 'hover:bg-slate-100/90 active:bg-slate-200/70 border-b border-slate-100 last:border-b-0' : 'hover:bg-white/[0.035] active:bg-white/[0.06] border-b border-white/[0.02] last:border-b-0'} transition-colors duration-150 cursor-pointer group select-none ${extraRowClass}`}
                   >
                     {columns.map((col, colIdx) => {
                       const align = col.align || 'left';
@@ -140,7 +141,7 @@ export default function DataTable({
           style={{
             backgroundColor: headerBg,
             borderColor: borderColor,
-            color: textMuted
+            color: isLight ? '#475569' : textMuted
           }}
         >
           {footer}
@@ -160,6 +161,8 @@ export function TableActionButton({
   onClick,
   variant = 'default', // 'primary' | 'default' | 'danger' | 'ghost'
   accentColor = '#10b981',
+  themeConfig = null,
+  isLight = null,
   className = '',
   disabled = false
 }) {
@@ -168,26 +171,36 @@ export function TableActionButton({
     if (onClick && !disabled) onClick(e);
   };
 
+  const lightMode = isLight !== null 
+    ? isLight 
+    : (themeConfig?.isLight ?? (typeof document !== 'undefined' && document.documentElement.classList.contains('light')));
+
   let variantStyle = {};
   let variantClass = '';
 
   if (variant === 'primary') {
-    variantClass = 'font-bold shadow-sm active:scale-95 hover:brightness-110';
+    variantClass = 'font-bold shadow-sm active:scale-95 hover:brightness-105';
     variantStyle = {
-      backgroundColor: `${accentColor}20`,
+      backgroundColor: `${accentColor}18`,
       borderColor: `${accentColor}40`,
       color: accentColor
     };
   } else if (variant === 'danger') {
-    variantClass = 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 hover:border-rose-800/40 active:scale-95';
+    variantClass = lightMode
+      ? 'text-slate-500 hover:text-rose-600 hover:bg-rose-50 border-transparent active:scale-95'
+      : 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 hover:border-rose-800/40 active:scale-95';
     variantStyle = {
       borderColor: 'transparent'
     };
   } else if (variant === 'ghost') {
-    variantClass = 'text-slate-400 hover:text-white hover:bg-slate-800/80 border-transparent hover:border-slate-700 active:scale-95';
+    variantClass = lightMode
+      ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100 border-transparent active:scale-95'
+      : 'text-slate-400 hover:text-white hover:bg-slate-800/80 border-transparent hover:border-slate-700 active:scale-95';
   } else {
     // default
-    variantClass = 'bg-slate-800/70 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/50 hover:border-slate-600 font-medium active:scale-95';
+    variantClass = lightMode
+      ? 'bg-slate-100 hover:bg-slate-200/90 text-slate-700 hover:text-slate-900 border-slate-300 hover:border-slate-400 font-medium active:scale-95 shadow-sm'
+      : 'bg-slate-800/70 hover:bg-slate-700/80 text-slate-300 hover:text-white border-slate-700/50 hover:border-slate-600 font-medium active:scale-95';
   }
 
   return (

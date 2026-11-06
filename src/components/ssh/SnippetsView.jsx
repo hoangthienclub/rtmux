@@ -74,6 +74,7 @@ const INITIAL_SNIPPETS = [
 
 export default function SnippetsView({ settings }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
   const [snippets, setSnippets] = useState(() => {
     try {
@@ -278,7 +279,10 @@ export default function SnippetsView({ settings }) {
   });
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto space-y-6 custom-scroll bg-[#070b14]">
+    <div 
+      className="flex-1 p-6 overflow-y-auto space-y-6 custom-scroll"
+      style={{ backgroundColor: currentThemeConfig.bg }}
+    >
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 px-4 py-2.5 rounded-xl bg-emerald-600 text-white font-medium text-xs shadow-2xl flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
@@ -297,26 +301,35 @@ export default function SnippetsView({ settings }) {
       />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#161e2e]">
+      <div 
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b"
+        style={{ borderColor: currentThemeConfig.border }}
+      >
         <div>
-          <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-            <Code2 size={16} className="text-emerald-400" />
+          <h2 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{ color: currentThemeConfig.text }}>
+            <Code2 size={16} className="text-emerald-500" />
             <span>Snippets (Kho Đoạn Lệnh & Kịch Bản Nhanh) ({snippets.length})</span>
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs mt-1" style={{ color: currentThemeConfig.textMuted }}>
             Lưu trữ câu lệnh thường dùng, quản lý, sao lưu Import / Export và sao chép 1-click.
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* View Mode Toggle: List vs Grid */}
-          <div className="flex items-center p-0.5 rounded-xl border border-[#1a2438] bg-[#0c101c]">
+          <div 
+            className="flex items-center p-0.5 rounded-xl border"
+            style={{ 
+              backgroundColor: currentThemeConfig.innerInput, 
+              borderColor: currentThemeConfig.border 
+            }}
+          >
             <button
               onClick={() => handleSetViewMode('list')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'list'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-slate-400 hover:text-white'
+                  ? (isLight ? 'bg-emerald-600 text-white font-bold' : 'bg-emerald-500/20 text-emerald-400')
+                  : (isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white')
               }`}
               title="Dạng danh sách (List View)"
             >
@@ -326,8 +339,8 @@ export default function SnippetsView({ settings }) {
               onClick={() => handleSetViewMode('grid')}
               className={`p-1.5 rounded-lg transition-all ${
                 viewMode === 'grid'
-                  ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'text-slate-400 hover:text-white'
+                  ? (isLight ? 'bg-emerald-600 text-white font-bold' : 'bg-emerald-500/20 text-emerald-400')
+                  : (isLight ? 'text-slate-500 hover:text-slate-900' : 'text-slate-400 hover:text-white')
               }`}
               title="Dạng thẻ lưới (Grid View)"
             >
@@ -343,17 +356,26 @@ export default function SnippetsView({ settings }) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Tìm câu lệnh..."
-              className="w-40 sm:w-48 h-8 bg-[#0c101c] border border-[#1a2438] rounded-xl pl-8 pr-3 text-xs text-white placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
+              className="w-40 sm:w-48 h-8 border rounded-xl pl-8 pr-3 text-xs placeholder-slate-500 font-mono focus:outline-none"
+              style={{
+                backgroundColor: currentThemeConfig.innerInput,
+                borderColor: currentThemeConfig.border,
+                color: currentThemeConfig.text
+              }}
             />
           </div>
 
           {/* Export JSON Button */}
           <button
             onClick={handleExportJson}
-            className="flex items-center gap-1.5 h-8 px-2.5 bg-[#0c101c] hover:bg-[#161f30] border border-[#1a2438] text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+            className={`flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95 cursor-pointer border ${
+              isLight 
+                ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900' 
+                : 'bg-[#0c101c] hover:bg-[#161f30] border-[#1a2438] text-slate-300 hover:text-white'
+            }`}
             title="Xuất danh sách snippets ra file JSON"
           >
-            <Download size={13} className="text-sky-400" />
+            <Download size={13} className="text-sky-500" />
             <span>Export JSON</span>
           </button>
 
@@ -364,10 +386,14 @@ export default function SnippetsView({ settings }) {
               setImportError('');
               setIsImportModalOpen(true);
             }}
-            className="flex items-center gap-1.5 h-8 px-2.5 bg-[#0c101c] hover:bg-[#161f30] border border-[#1a2438] text-slate-300 hover:text-white text-xs font-semibold rounded-xl transition-all shadow-sm active:scale-95 cursor-pointer"
+            className={`flex items-center gap-1.5 h-8 px-2.5 rounded-xl text-xs font-semibold transition-all shadow-sm active:scale-95 cursor-pointer border ${
+              isLight 
+                ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900' 
+                : 'bg-[#0c101c] hover:bg-[#161f30] border-[#1a2438] text-slate-300 hover:text-white'
+            }`}
             title="Nhập snippets từ file JSON hoặc dán text"
           >
-            <Upload size={13} className="text-amber-400" />
+            <Upload size={13} className="text-amber-500" />
             <span>Import JSON</span>
           </button>
 
@@ -390,8 +416,8 @@ export default function SnippetsView({ settings }) {
             onClick={() => setSelectedCategory(cat)}
             className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all ${
               selectedCategory === cat
-                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm'
-                : 'bg-[#0d121f] text-slate-400 hover:text-white border border-[#172133]'
+                ? (isLight ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm')
+                : (isLight ? 'bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-300' : 'bg-[#0d121f] text-slate-400 hover:text-white border border-[#172133]')
             }`}
           >
             {cat}
@@ -408,7 +434,7 @@ export default function SnippetsView({ settings }) {
               label: 'TÊN SNIPPET',
               render: (s) => (
                 <div>
-                  <div className="font-bold text-white text-xs">{s.name}</div>
+                  <div className="font-bold text-xs" style={{ color: currentThemeConfig.text }}>{s.name}</div>
                   {s.description && (
                     <div className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{s.description}</div>
                   )}
@@ -420,7 +446,11 @@ export default function SnippetsView({ settings }) {
               label: 'DANH MỤC',
               width: 'w-28',
               render: (s) => (
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#131b2e] text-emerald-400 border border-[#1f2c4a]">
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                  isLight 
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold' 
+                    : 'bg-[#131b2e] text-emerald-400 border border-[#1f2c4a]'
+                }`}>
                   {s.category}
                 </span>
               )
@@ -428,7 +458,7 @@ export default function SnippetsView({ settings }) {
             {
               key: 'command',
               label: 'LỆNH (COMMAND)',
-              className: 'font-mono text-emerald-300 text-[11px] max-w-[280px] truncate select-all',
+              className: `font-mono text-[11px] max-w-[280px] truncate select-all ${isLight ? 'text-emerald-700 font-medium' : 'text-emerald-300'}`,
               render: (s) => <span title={s.command}>{s.command}</span>
             },
             {
@@ -439,13 +469,17 @@ export default function SnippetsView({ settings }) {
                 <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => handleCopy(s.id, s.command)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#101626] hover:bg-[#18233c] border border-[#1c2942] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm border ${
+                      isLight 
+                        ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900' 
+                        : 'bg-[#101626] hover:bg-[#18233c] border-[#1c2942] text-slate-300 hover:text-white'
+                    }`}
                     title="Sao chép câu lệnh"
                   >
                     {copiedId === s.id ? (
                       <>
-                        <Check size={12} className="text-emerald-400" />
-                        <span className="text-emerald-400 text-[11px] font-semibold">Đã chép</span>
+                        <Check size={12} className="text-emerald-500" />
+                        <span className="text-emerald-600 text-[11px] font-semibold">Đã chép</span>
                       </>
                     ) : (
                       <>
@@ -481,22 +515,30 @@ export default function SnippetsView({ settings }) {
           {filteredSnippets.map((s) => (
             <div
               key={s.id}
-              className="bg-[#0b0f1a] border border-[#161f30] hover:border-emerald-500/40 rounded-2xl p-4 flex flex-col justify-between transition-all group shadow-md"
+              className="border hover:border-emerald-500/40 rounded-2xl p-4 flex flex-col justify-between transition-all group shadow-md"
+              style={{
+                backgroundColor: currentThemeConfig.card,
+                borderColor: currentThemeConfig.border
+              }}
             >
               <div>
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div>
-                    <h3 className="font-semibold text-sm text-white flex items-center gap-2">
+                    <h3 className="font-semibold text-sm flex items-center gap-2" style={{ color: currentThemeConfig.text }}>
                       {s.name}
                     </h3>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#131b2e] text-emerald-400 border border-[#1f2c4a] inline-block mt-1">
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border inline-block mt-1 ${
+                      isLight 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 font-semibold' 
+                        : 'bg-[#131b2e] text-emerald-400 border border-[#1f2c4a]'
+                    }`}>
                       {s.category}
                     </span>
                   </div>
 
                   <button
                     onClick={() => setSnippetToDelete(s)}
-                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-500 hover:text-red-400 rounded transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-red-500 rounded transition-all"
                     title="Xóa snippet"
                   >
                     <Trash2 size={13} />
@@ -504,16 +546,25 @@ export default function SnippetsView({ settings }) {
                 </div>
 
                 {s.description && (
-                  <p className="text-xs text-slate-400 mb-3">{s.description}</p>
+                  <p className="text-xs text-slate-500 mb-3">{s.description}</p>
                 )}
 
                 {/* Code Command Box */}
-                <div className="p-2.5 rounded-xl bg-[#060810] border border-[#141a27] font-mono text-xs text-emerald-300 break-all select-all mb-3.5">
+                <div 
+                  className={`p-2.5 rounded-xl border font-mono text-xs break-all select-all mb-3.5 ${
+                    isLight 
+                      ? 'bg-slate-50 border-slate-200 text-emerald-800 font-medium' 
+                      : 'bg-[#060810] border-[#141a27] text-emerald-300'
+                  }`}
+                >
                   {s.command}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2.5 border-t border-[#141b2c]">
+              <div 
+                className="flex items-center justify-between pt-2.5 border-t"
+                style={{ borderColor: currentThemeConfig.border }}
+              >
                 <span className="text-[10.5px] text-slate-500 font-sans">
                   Sao chép 1-click & sử dụng
                 </span>
@@ -521,13 +572,17 @@ export default function SnippetsView({ settings }) {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleCopy(s.id, s.command)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#101626] hover:bg-[#18233c] border border-[#1c2942] text-slate-300 hover:text-white rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm"
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all active:scale-95 cursor-pointer shadow-sm border ${
+                      isLight 
+                        ? 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700 hover:text-slate-900' 
+                        : 'bg-[#101626] hover:bg-[#18233c] border-[#1c2942] text-slate-300 hover:text-white'
+                    }`}
                     title="Copy command to clipboard"
                   >
                     {copiedId === s.id ? (
                       <>
-                        <Check size={12} className="text-emerald-400" />
-                        <span className="text-emerald-400 text-[11px] font-semibold">Đã chép</span>
+                        <Check size={12} className="text-emerald-500" />
+                        <span className="text-emerald-600 text-[11px] font-semibold">Đã chép</span>
                       </>
                     ) : (
                       <>
@@ -550,27 +605,38 @@ export default function SnippetsView({ settings }) {
           onClick={() => setIsImportModalOpen(false)}
         >
           <div 
-            className="bg-[#121622] border border-[#1e2638] rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4"
+            className="rounded-2xl w-full max-w-lg p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 space-y-4 border"
+            style={{
+              backgroundColor: currentThemeConfig.card,
+              borderColor: currentThemeConfig.border
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-[#1c2436]">
+            <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: currentThemeConfig.border }}>
               <div className="flex items-center gap-2">
-                <Upload size={18} className="text-amber-400" />
-                <h3 className="font-bold text-base text-white">Import Danh Sách Snippets</h3>
+                <Upload size={18} className="text-amber-500" />
+                <h3 className="font-bold text-base" style={{ color: currentThemeConfig.text }}>Import Danh Sách Snippets</h3>
               </div>
               <button
                 onClick={() => setIsImportModalOpen(false)}
-                className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-[#1a2336] cursor-pointer"
+                className="p-1 rounded-lg transition-colors hover:bg-slate-500/20 cursor-pointer"
+                style={{ color: currentThemeConfig.textMuted }}
               >
                 <X size={16} />
               </button>
             </div>
 
             {/* File Upload Trigger */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[#090d16] border border-[#1e273a]">
+            <div 
+              className="flex items-center justify-between p-3 rounded-xl border"
+              style={{
+                backgroundColor: currentThemeConfig.innerInput,
+                borderColor: currentThemeConfig.border
+              }}
+            >
               <div>
-                <div className="text-xs font-semibold text-white">Tải lên từ file .JSON</div>
-                <div className="text-[11px] text-slate-400">Chọn file sao lưu backup snippets có sẵn trên máy</div>
+                <div className="text-xs font-semibold" style={{ color: currentThemeConfig.text }}>Tải lên từ file .JSON</div>
+                <div className="text-[11px]" style={{ color: currentThemeConfig.textMuted }}>Chọn file sao lưu backup snippets có sẵn trên máy</div>
               </div>
               <button
                 type="button"
@@ -585,14 +651,14 @@ export default function SnippetsView({ settings }) {
             {/* Paste JSON Text Area */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-medium text-slate-300">
+                <label className="text-xs font-medium" style={{ color: currentThemeConfig.text }}>
                   Hoặc dán nội dung JSON vào đây:
                 </label>
                 {importJsonText && (
                   <button
                     type="button"
                     onClick={() => setImportJsonText('')}
-                    className="text-[11px] text-rose-400 hover:underline cursor-pointer"
+                    className="text-[11px] text-rose-500 hover:underline cursor-pointer"
                   >
                     Xóa trắng
                   </button>
@@ -606,21 +672,26 @@ export default function SnippetsView({ settings }) {
                   setImportError('');
                 }}
                 placeholder={`[\n  {\n    "name": "Check Docker",\n    "command": "docker ps",\n    "category": "Docker"\n  }\n]`}
-                className="w-full bg-[#090d16] border border-[#1e273a] rounded-xl p-3 text-xs text-emerald-400 placeholder-slate-600 font-mono focus:outline-none focus:border-emerald-500"
+                className="w-full border rounded-xl p-3 text-xs placeholder-slate-500 font-mono focus:outline-none"
+                style={{
+                  backgroundColor: currentThemeConfig.innerInput,
+                  borderColor: currentThemeConfig.border,
+                  color: isLight ? '#047857' : '#34d399'
+                }}
               />
             </div>
 
             {/* Import Mode Options */}
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-2">
+              <label className="block text-xs font-medium mb-2" style={{ color: currentThemeConfig.text }}>
                 Chế độ nhập dữ liệu:
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <label 
                   className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
                     importMode === 'merge' 
-                      ? 'bg-emerald-950/30 border-emerald-500/50 text-white' 
-                      : 'bg-[#090d16] border-[#1e273a] text-slate-400 hover:border-slate-600'
+                      ? (isLight ? 'bg-emerald-50 border-emerald-500 text-emerald-950 font-medium' : 'bg-emerald-950/30 border-emerald-500/50 text-white')
+                      : (isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-[#090d16] border-[#1e273a] text-slate-400')
                   }`}
                 >
                   <input
@@ -632,8 +703,8 @@ export default function SnippetsView({ settings }) {
                     className="mt-0.5 accent-emerald-500"
                   />
                   <div>
-                    <div className="text-xs font-bold text-white">Gộp thêm (Merge)</div>
-                    <div className="text-[10.5px] text-slate-400 leading-snug mt-0.5">
+                    <div className="text-xs font-bold" style={{ color: currentThemeConfig.text }}>Gộp thêm (Merge)</div>
+                    <div className="text-[10.5px] leading-snug mt-0.5" style={{ color: currentThemeConfig.textMuted }}>
                       Giữ nguyên {snippets.length} snippets hiện có, chỉ thêm các snippet mới.
                     </div>
                   </div>
@@ -642,8 +713,8 @@ export default function SnippetsView({ settings }) {
                 <label 
                   className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
                     importMode === 'overwrite' 
-                      ? 'bg-rose-950/30 border-rose-500/50 text-white' 
-                      : 'bg-[#090d16] border-[#1e273a] text-slate-400 hover:border-slate-600'
+                      ? (isLight ? 'bg-rose-50 border-rose-500 text-rose-950 font-medium' : 'bg-rose-950/30 border-rose-500/50 text-white')
+                      : (isLight ? 'bg-slate-50 border-slate-200 text-slate-700' : 'bg-[#090d16] border-[#1e273a] text-slate-400')
                   }`}
                 >
                   <input
@@ -655,8 +726,8 @@ export default function SnippetsView({ settings }) {
                     className="mt-0.5 accent-rose-500"
                   />
                   <div>
-                    <div className="text-xs font-bold text-white">Ghi đè tất cả (Replace)</div>
-                    <div className="text-[10.5px] text-slate-400 leading-snug mt-0.5">
+                    <div className="text-xs font-bold" style={{ color: currentThemeConfig.text }}>Ghi đè tất cả (Replace)</div>
+                    <div className="text-[10.5px] leading-snug mt-0.5" style={{ color: currentThemeConfig.textMuted }}>
                       Thay thế toàn bộ kho hiện tại bằng danh sách mới từ file nhập.
                     </div>
                   </div>
@@ -666,25 +737,26 @@ export default function SnippetsView({ settings }) {
 
             {/* Error Message */}
             {importError && (
-              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-950/40 border border-rose-800/50 text-rose-300 text-xs font-mono">
-                <AlertCircle size={14} className="flex-shrink-0 text-rose-400" />
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-rose-50 border border-rose-300 text-rose-700 text-xs font-mono">
+                <AlertCircle size={14} className="flex-shrink-0 text-rose-600" />
                 <span>{importError}</span>
               </div>
             )}
 
             {/* Modal Actions */}
-            <div className="flex justify-end gap-2.5 pt-3 border-t border-[#1c2436]">
+            <div className="flex justify-end gap-2.5 pt-3 border-t" style={{ borderColor: currentThemeConfig.border }}>
               <button
                 type="button"
                 onClick={() => setIsImportModalOpen(false)}
-                className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl hover:bg-[#1a2336] transition-all cursor-pointer"
+                className="px-4 py-2 text-xs font-medium rounded-xl transition-all cursor-pointer"
+                style={{ color: currentThemeConfig.textMuted }}
               >
                 Hủy
               </button>
               <button
                 type="button"
                 onClick={handleConfirmImport}
-                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-[0_0_12px_rgba(245,158,11,0.3)] transition-all cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-md transition-all cursor-pointer active:scale-95"
               >
                 <Upload size={13} />
                 <span>Xác Nhận Import</span>
@@ -701,14 +773,19 @@ export default function SnippetsView({ settings }) {
           onClick={() => setIsAddModalOpen(false)}
         >
           <div 
-            className="bg-[#121622] border border-[#1e2638] rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150"
+            className="rounded-2xl w-full max-w-md p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 border"
+            style={{
+              backgroundColor: currentThemeConfig.card,
+              borderColor: currentThemeConfig.border
+            }}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between pb-3 border-b border-[#1c2436] mb-4">
-              <h3 className="font-bold text-base text-white">Thêm Đoạn Lệnh Snippet</h3>
+            <div className="flex items-center justify-between pb-3 border-b mb-4" style={{ borderColor: currentThemeConfig.border }}>
+              <h3 className="font-bold text-base" style={{ color: currentThemeConfig.text }}>Thêm Đoạn Lệnh Snippet</h3>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-[#1a2336]"
+                className="p-1 rounded-lg transition-colors hover:bg-slate-500/20"
+                style={{ color: currentThemeConfig.textMuted }}
               >
                 <X size={16} />
               </button>
@@ -716,7 +793,7 @@ export default function SnippetsView({ settings }) {
 
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium mb-1.5" style={{ color: currentThemeConfig.text }}>
                   Tên đoạn lệnh
                 </label>
                 <input
@@ -725,18 +802,28 @@ export default function SnippetsView({ settings }) {
                   placeholder="e.g. Restart PM2 Application"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full h-9 bg-[#090d16] border border-[#1e273a] rounded-xl px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full h-9 border rounded-xl px-3 text-xs placeholder-slate-500 focus:outline-none"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.text
+                  }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium mb-1.5" style={{ color: currentThemeConfig.text }}>
                   Nhóm danh mục
                 </label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full h-9 bg-[#090d16] border border-[#1e273a] rounded-xl px-3 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full h-9 border rounded-xl px-3 text-xs focus:outline-none"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.text
+                  }}
                 >
                   <option value="Docker">Docker</option>
                   <option value="System">System</option>
@@ -746,7 +833,7 @@ export default function SnippetsView({ settings }) {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium mb-1.5" style={{ color: currentThemeConfig.text }}>
                   Câu lệnh thực thi (Command)
                 </label>
                 <textarea
@@ -755,12 +842,17 @@ export default function SnippetsView({ settings }) {
                   placeholder="e.g. pm2 restart all && pm2 status"
                   value={newCommand}
                   onChange={(e) => setNewCommand(e.target.value)}
-                  className="w-full bg-[#090d16] border border-[#1e273a] rounded-xl p-3 text-xs text-emerald-400 placeholder-slate-500 font-mono focus:outline-none focus:border-emerald-500"
+                  className="w-full border rounded-xl p-3 text-xs placeholder-slate-500 font-mono focus:outline-none"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: isLight ? '#047857' : '#34d399'
+                  }}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">
+                <label className="block text-xs font-medium mb-1.5" style={{ color: currentThemeConfig.text }}>
                   Mô tả ngắn
                 </label>
                 <input
@@ -768,15 +860,21 @@ export default function SnippetsView({ settings }) {
                   placeholder="e.g. Khởi động lại toàn bộ app NodeJS"
                   value={newDescription}
                   onChange={(e) => setNewDescription(e.target.value)}
-                  className="w-full h-9 bg-[#090d16] border border-[#1e273a] rounded-xl px-3 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full h-9 border rounded-xl px-3 text-xs placeholder-slate-500 focus:outline-none"
+                  style={{
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.text
+                  }}
                 />
               </div>
 
-              <div className="flex justify-end gap-2.5 pt-4 border-t border-[#1c2436]">
+              <div className="flex justify-end gap-2.5 pt-4 border-t" style={{ borderColor: currentThemeConfig.border }}>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
-                  className="px-4 py-2 text-xs font-medium text-slate-400 hover:text-white rounded-xl hover:bg-[#1a2336] transition-all"
+                  className="px-4 py-2 text-xs font-medium rounded-xl transition-all"
+                  style={{ color: currentThemeConfig.textMuted }}
                 >
                   Hủy
                 </button>

@@ -71,15 +71,32 @@ export default function MachineCard({
   const lang = settings?.language || 'vi';
   const t = translations[lang] || translations.vi;
 
+  const isLight = !!currentThemeConfig?.isLight;
   const isWin = machine.os === 'windows';
   const isWsl = machine.os === 'wsl';
-  const tagColor = 
-    machine.tag === 'Production' ? 'bg-red-950/60 text-red-400 border-red-800/40' :
-    machine.tag === 'UAT' ? 'bg-amber-950/60 text-amber-400 border-amber-800/40' :
-    machine.tag === 'Dev' ? 'bg-sky-950/60 text-sky-400 border-sky-800/40' :
-    'bg-[#1a2336] text-slate-300 border-[#26354f]';
+  const tagColor = isLight
+    ? machine.tag === 'Production' ? 'bg-rose-50 text-rose-700 border-rose-300' :
+      machine.tag === 'UAT' ? 'bg-amber-50 text-amber-800 border-amber-300' :
+      machine.tag === 'Dev' ? 'bg-sky-50 text-sky-700 border-sky-300' :
+      'bg-slate-100 text-slate-700 border-slate-300'
+    : machine.tag === 'Production' ? 'bg-red-950/60 text-red-400 border-red-800/40' :
+      machine.tag === 'UAT' ? 'bg-amber-950/60 text-amber-400 border-amber-800/40' :
+      machine.tag === 'Dev' ? 'bg-sky-950/60 text-sky-400 border-sky-800/40' :
+      'bg-[#1a2336] text-slate-300 border-[#26354f]';
 
   const isOnline = machine.uptime && !machine.uptime.includes('Click') && machine.uptime !== 'Offline';
+
+  const osBadgeClass = isLight
+    ? isWin
+      ? 'bg-sky-50 border border-sky-300 text-sky-800'
+      : isWsl
+      ? 'bg-emerald-50 border border-emerald-300 text-emerald-800'
+      : 'bg-blue-50 border border-blue-300 text-blue-800'
+    : isWin
+      ? 'bg-[#0284c7]/20 border border-[#0284c7]/50 text-[#38bdf8]'
+      : isWsl
+      ? 'bg-[#10b981]/20 border border-[#10b981]/50 text-[#10b981]'
+      : 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-400';
 
   return (
     <div
@@ -94,13 +111,7 @@ export default function MachineCard({
         {/* Header: OS Badge, Name, IP, Quick Connect */}
         <div className="flex items-start justify-between mb-3.5">
           <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shadow-inner ${
-              isWin
-                ? 'bg-[#0284c7]/20 border border-[#0284c7]/50 text-[#38bdf8]'
-                : isWsl
-                ? 'bg-[#10b981]/20 border border-[#10b981]/50 text-[#10b981]'
-                : 'bg-emerald-950/60 border border-emerald-500/30 text-emerald-400'
-            }`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-xs shadow-inner ${osBadgeClass}`}>
               {isWin ? 'WIN' : isWsl ? 'WSL' : 'SSH'}
             </div>
             <div>
@@ -209,7 +220,11 @@ export default function MachineCard({
           {onOpenSftp && (
             <button
               onClick={() => onOpenSftp(machine)}
-              className="flex items-center gap-1 px-2 py-1 bg-sky-950/40 hover:bg-sky-600 hover:text-white text-sky-400 border border-sky-800/40 rounded-lg text-[11px] font-medium transition-all"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                isLight
+                  ? 'bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300'
+                  : 'bg-sky-950/40 hover:bg-sky-600 hover:text-white text-sky-400 border border-sky-800/40'
+              }`}
               title={t.browseSftp || 'Duyệt file SFTP'}
             >
               <FolderSync size={12} />
@@ -220,7 +235,11 @@ export default function MachineCard({
           {onOpenDocker && (
             <button
               onClick={() => onOpenDocker(machine)}
-              className="flex items-center gap-1 px-2 py-1 bg-[#121a2a] hover:bg-purple-600 hover:text-white text-purple-400 border border-[#1c2940] rounded-lg text-[11px] font-medium transition-all"
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all ${
+                isLight
+                  ? 'bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300'
+                  : 'bg-[#121a2a] hover:bg-purple-600 hover:text-white text-purple-400 border border-[#1c2940]'
+              }`}
               title="Xem Docker Containers"
             >
               <Box size={12} />
@@ -233,7 +252,11 @@ export default function MachineCard({
           {onEdit && (
             <button
               onClick={() => onEdit(machine)}
-              className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-[#1a2336] transition-all"
+              className={`p-1 rounded-lg transition-all ${
+                isLight
+                  ? 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+                  : 'text-slate-400 hover:text-white hover:bg-[#1a2336]'
+              }`}
               title="Chỉnh sửa cấu hình host"
             >
               <Settings2 size={13} />
@@ -243,7 +266,11 @@ export default function MachineCard({
           {onDelete && machine.id !== 'local_win' && (
             <button
               onClick={() => onDelete(machine.id)}
-              className="p-1 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-950/30 transition-all"
+              className={`p-1 rounded-lg transition-all ${
+                isLight
+                  ? 'text-slate-500 hover:text-red-600 hover:bg-rose-50'
+                  : 'text-slate-500 hover:text-red-400 hover:bg-red-950/30'
+              }`}
               title="Xóa máy chủ"
             >
               <Trash2 size={13} />

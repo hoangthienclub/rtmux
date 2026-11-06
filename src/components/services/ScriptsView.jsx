@@ -524,6 +524,7 @@ export default function ScriptsView({
   lastTaskLog
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
+  const isLight = !!currentThemeConfig?.isLight;
   const accentColor = settings?.accentColor || '#10b981';
 
   const [scripts, setScripts] = useState([]);
@@ -921,15 +922,19 @@ export default function ScriptsView({
                     </button>
                     <button
                       onClick={() => setModalScript(script)}
-                      className="p-1.5 hover:text-white rounded-lg transition-colors cursor-pointer"
-                      style={{ color: currentThemeConfig.textMuted }}
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                        isLight ? 'hover:bg-slate-200 text-slate-600 hover:text-slate-900' : 'hover:text-white'
+                      }`}
+                      style={!isLight ? { color: currentThemeConfig.textMuted } : {}}
                       title="Chỉnh sửa script"
                     >
                       <Edit3 size={13} />
                     </button>
                     <button
                       onClick={() => handleDeleteScript(script.id, script.name)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-rose-950/30 transition-colors cursor-pointer"
+                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                        isLight ? 'text-slate-400 hover:text-rose-600 hover:bg-rose-50' : 'text-slate-400 hover:text-rose-400 hover:bg-rose-950/30'
+                      }`}
                       title="Xóa script"
                     >
                       <Trash2 size={13} />

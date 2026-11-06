@@ -142,18 +142,18 @@ export default function Sidebar({
           </div>
         </div>
 
-        {/* 1. TOP PRIORITY GROUP: MICROSERVICES DEV (EXPANDED BY DEFAULT) */}
+        {/* 1. TOP PRIORITY GROUP: MICROSERVICES (EXPANDED BY DEFAULT) */}
         <div className="space-y-1">
           <button
             onClick={toggleServices}
-            className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-widest transition-colors cursor-pointer"
+            className="w-full flex items-center justify-between px-2 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer"
             style={{ color: accentColor }}
           >
-            <div className="flex items-center gap-1.5">
-              <Layers size={13} style={{ color: accentColor }} />
-              <span>{t.microservicesDev || 'Microservices Dev'}</span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Layers size={13} className="shrink-0" style={{ color: accentColor }} />
+              <span className="truncate whitespace-nowrap">{t.microservicesDev || 'MICROSERVICES'}</span>
             </div>
-            <div className="flex items-center gap-1" style={{ color: currentThemeConfig.textMuted }}>
+            <div className="flex items-center gap-1 shrink-0" style={{ color: currentThemeConfig.textMuted }}>
               <span className="text-[9.5px] font-mono lowercase">{runningCount}/{totalCount}</span>
               {isOpenServices ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </div>
