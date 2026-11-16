@@ -4,6 +4,7 @@ import {
   Plus, 
   Trash2, 
   Edit3, 
+  Terminal,
   Folder, 
   FolderOpen,
   Play, 
@@ -704,6 +705,7 @@ export default function ManageServicesView({
   onAddNewService,
   onUpdateService,
   onDeleteService,
+  onOpenTerminal,
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
@@ -1214,6 +1216,22 @@ export default function ManageServicesView({
 
               <div className="flex items-center space-x-2 self-end md:self-center flex-shrink-0">
                 <button
+                  onClick={() => onOpenTerminal && onOpenTerminal(svc)}
+                  className={`p-2 rounded-xl text-xs transition-all border ${
+                    isLight 
+                      ? 'bg-slate-100 hover:bg-emerald-50 border-slate-300 text-slate-700 hover:text-emerald-700' 
+                      : 'hover:text-emerald-400'
+                  }`}
+                  style={!isLight ? {
+                    backgroundColor: currentThemeConfig.innerInput,
+                    borderColor: currentThemeConfig.border,
+                    color: currentThemeConfig.textMuted
+                  } : {}}
+                  title={`Mở Terminal tại ${svc.name}`}
+                >
+                  <Terminal size={14} />
+                </button>
+                <button
                   onClick={() => setModalService(svc)}
                   className={`p-2 rounded-xl text-xs transition-all border ${
                     isLight 
@@ -1302,6 +1320,16 @@ export default function ManageServicesView({
                 className="pt-3 border-t flex items-center justify-end space-x-2"
                 style={{ borderColor: currentThemeConfig.border }}
               >
+                <button 
+                  onClick={() => onOpenTerminal && onOpenTerminal(svc)} 
+                  className={`p-1.5 rounded-lg transition-all ${
+                    isLight ? 'hover:bg-emerald-50 text-slate-600 hover:text-emerald-700' : 'hover:text-emerald-400'
+                  }`} 
+                  style={!isLight ? { color: currentThemeConfig.textMuted } : {}}
+                  title={`Mở Terminal tại ${svc.name}`}
+                >
+                  <Terminal size={14} />
+                </button>
                 <button 
                   onClick={() => setModalService(svc)} 
                   className={`p-1.5 rounded-lg transition-all ${

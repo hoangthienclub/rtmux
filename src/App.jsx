@@ -744,7 +744,7 @@ export default function App() {
     }
   };
 
-  const handleOpenLocalTerminal = useCallback(() => {
+  const handleOpenLocalTerminal = useCallback((initialCmd = null, customName = null) => {
     const isWin = isWindowsOS();
     const isMac = typeof navigator !== 'undefined' && (/mac/i.test(navigator.platform) || /macintosh/i.test(navigator.userAgent));
     const isLinux = !isWin && !isMac;
@@ -755,7 +755,7 @@ export default function App() {
         const distro = settings?.wslDistro || 'Ubuntu-24.04';
         localSession = {
           id: 'local_wsl_' + Date.now(),
-          name: `WSL (${distro})`,
+          name: customName || `WSL (${distro})`,
           host: 'localhost',
           os: 'wsl',
           shell: 'wsl',
@@ -765,7 +765,7 @@ export default function App() {
       } else {
         localSession = {
           id: 'local_win_' + Date.now(),
-          name: 'Windows PowerShell',
+          name: customName || 'Windows PowerShell',
           host: 'localhost',
           os: 'windows',
           shell: 'powershell',
@@ -775,7 +775,7 @@ export default function App() {
     } else if (isMac) {
       localSession = {
         id: 'local_mac_' + Date.now(),
-        name: 'macOS Terminal',
+        name: customName || 'macOS Terminal',
         host: 'localhost',
         os: 'macos',
         shell: 'zsh',
@@ -784,7 +784,7 @@ export default function App() {
     } else {
       localSession = {
         id: 'local_linux_' + Date.now(),
-        name: 'Ubuntu Linux Terminal',
+        name: customName || 'Ubuntu Linux Terminal',
         host: 'localhost',
         os: 'linux',
         shell: 'bash',
@@ -792,8 +792,47 @@ export default function App() {
       };
     }
 
-    handleConnectMachine(localSession);
+    handleConnectMachine(localSession, initialCmd);
   }, [settings?.enableWsl, settings?.wslDistro]);
+
+  const handleOpenServiceTerminal = useCallback(async (service, options = {}) => {
+    if (!service) return;
+    const withEnv = Boolean(options.withEnv);
+    const targetService = typeof service === 'string' 
+      ? services.find(s => s.id === service) 
+      : service;
+    if (!targetService) return;
+
+    const cwd = targetService.cwd || targetService.path || '';
+    const activeProf = targetService.activeProfile || 'default';
+    const isWin = isWindowsOS();
+    const useWsl = isWin && settings?.enableWsl;
+
+    let cmd = '';
+    if (cwd) {
+      if (useWsl || !isWin) {
+        if (withEnv) {
+          try {
+            await fetch(`${BASE_URL}/api/services/${targetService.id}/export-env`, { method: 'POST' });
+          } catch (_) {}
+          cmd = `cd "${cwd}" && set -a && [ -f .env ] && . ./.env && set +a && clear && echo -e "\\x1b[32m✔ Service Terminal: ${targetService.name} (Profile: ${activeProf})\\x1b[0m\\nThư mục: $(pwd)\\nĐã nạp toàn bộ biến môi trường! Gõ \\x1b[33menv\\x1b[0m để xem.\\n"`;
+        } else {
+          cmd = `cd "${cwd}" && clear && echo -e "\\x1b[32m✔ Service Terminal: ${targetService.name} (Port ${targetService.port || 'N/A'})\\x1b[0m\\nThư mục: $(pwd)\\n"`;
+        }
+      } else {
+        cmd = `cd "${cwd}"; Clear-Host; Write-Host "✔ Service Terminal: ${targetService.name}" -ForegroundColor Green; Get-Location`;
+      }
+    } else {
+      if (useWsl || !isWin) {
+        cmd = `echo -e "\\x1b[33m⚠️ Chú ý: Chưa cấu hình đường dẫn thư mục (cwd) cho service ${targetService.name}\\x1b[0m"`;
+      } else {
+        cmd = `Write-Host "⚠️ Chú ý: Chưa cấu hình đường dẫn thư mục (cwd) cho service ${targetService.name}" -ForegroundColor Yellow`;
+      }
+    }
+
+    const sessionTitle = `${targetService.name} (Terminal)`;
+    handleOpenLocalTerminal(cmd, sessionTitle);
+  }, [services, settings?.enableWsl, handleOpenLocalTerminal]);
 
   const handleSaveMachine = (machData) => {
     setMachines((prev) => {
@@ -1786,6 +1825,7 @@ export default function App() {
                 await reloadMicroservices();
               }}
               onRestartService={handleRestartService}
+              onOpenTerminal={handleOpenServiceTerminal}
               settings={settings}
             />
           ) : currentNav === 'categories' ? (
@@ -1801,6 +1841,7 @@ export default function App() {
               onAddNewService={(newSvc) => setServices(prev => [...prev, newSvc])} 
               onUpdateService={(updatedSvc) => setServices(prev => prev.map(s => s.id === updatedSvc.id ? { ...s, ...updatedSvc } : s))}
               onDeleteService={(id) => setServices(prev => prev.filter(s => s.id !== id))} 
+              onOpenTerminal={handleOpenServiceTerminal}
               settings={settings} 
             />
           ) : currentNav === 'scripts' ? (
@@ -1833,6 +1874,7 @@ export default function App() {
               onKillAll={handleKillAll}
               onReloadServices={reloadMicroservices}
               batchActionLoading={batchActionLoading}
+              onOpenTerminal={handleOpenServiceTerminal}
               settings={settings}
             />
           )}

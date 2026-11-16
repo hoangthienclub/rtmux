@@ -20,10 +20,11 @@ import {
   UploadCloud,
   FileCode2,
   Tag,
-  Edit3
+  Edit3,
+  Terminal
 } from 'lucide-react';
 import { THEME_CONFIGS } from '../../constants/palettes';
-import { BASE_URL } from '../../services/microserviceClient';
+import { BASE_URL, ensureBackendRunning } from '../../services/microserviceClient';
 import BackupRestoreModal from './BackupRestoreModal';
 import ConfirmModal from '../common/ConfirmModal';
 
@@ -897,6 +898,31 @@ function ProfilesManagerPane({
   );
 }
 
+// Helper to parse raw .env text into structured pairs
+export function parseRawEnvText(text = '') {
+  const lines = String(text || '').split('\n');
+  const parsed = [];
+  for (const line of lines) {
+    const clean = line.trim().replace(/^export\s+/, '');
+    if (!clean || clean.startsWith('#')) continue;
+    const eqIdx = clean.indexOf('=');
+    if (eqIdx !== -1) {
+      const k = clean.slice(0, eqIdx).trim();
+      let v = clean.slice(eqIdx + 1).trim();
+      if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+        v = v.slice(1, -1);
+      }
+      if (k) parsed.push({ key: k, value: v });
+    }
+  }
+  return parsed;
+}
+
+// Helper to format structured pairs into raw .env text
+export function formatPairsToEnvText(pairs = []) {
+  return (pairs || []).map(p => `${p.key}=${p.value ?? ''}`).join('\n');
+}
+
 // ================= MAIN ENV SETUP VIEW =================
 export default function EnvSetupView({
   services = [],
@@ -907,6 +933,7 @@ export default function EnvSetupView({
   onCreateProfile,
   onDeleteProfile,
   onRestartService,
+  onOpenTerminal,
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
@@ -965,7 +992,8 @@ export default function EnvSetupView({
 
   // Fetch global env from server on mount
   useEffect(() => {
-    fetch(`${BASE_URL}/api/global-env`)
+    ensureBackendRunning({ enableWsl: settings?.enableWsl, wslDistro: settings?.wslDistro })
+      .then(() => fetch(`${BASE_URL}/api/global-env`))
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -978,6 +1006,10 @@ export default function EnvSetupView({
             value: String(value)
           }));
           setGlobalEnvPairs(pairs);
+          if (activeTab === 'global') {
+            setEnvPairs(pairs);
+            setRawText(formatPairsToEnvText(pairs));
+          }
         }
       })
       .catch(e => console.error('Failed to fetch global env:', e));
@@ -985,6 +1017,7 @@ export default function EnvSetupView({
 
   const handleChangeGlobalProfile = async (profileKey) => {
     try {
+      await ensureBackendRunning({ enableWsl: settings?.enableWsl, wslDistro: settings?.wslDistro });
       const res = await fetch(`${BASE_URL}/api/global-env/active-profile`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -997,7 +1030,7 @@ export default function EnvSetupView({
         const pairs = Object.entries(data.globalEnv || {}).map(([key, value]) => ({ key, value: String(value) }));
         setGlobalEnvPairs(pairs);
         setEnvPairs(pairs);
-        setRawText(pairs.map(p => `${p.key}=${p.value}`).join('\n'));
+        setRawText(formatPairsToEnvText(pairs));
       }
     } catch (e) {
       console.error('Failed to change global profile:', e);
@@ -1024,18 +1057,30 @@ export default function EnvSetupView({
   // Load Env when tab or profile changes
   useEffect(() => {
     if (activeTab === 'global') {
+      const profileEnv = globalProfiles?.[activeGlobalProfile]?.env;
+      if (profileEnv && Object.keys(profileEnv).length > 0) {
+        const pairs = Object.entries(profileEnv).map(([key, value]) => ({ key, value: String(value) }));
+        setEnvPairs(pairs);
+        setRawText(formatPairsToEnvText(pairs));
+        return;
+      }
+      if (globalEnvPairs && globalEnvPairs.length > 0) {
+        setEnvPairs(globalEnvPairs);
+        setRawText(formatPairsToEnvText(globalEnvPairs));
+        return;
+      }
       const cached = localStorage.getItem(getStorageKey('global', activeGlobalProfile));
-      if (cached && (!globalEnvPairs || globalEnvPairs.length === 0)) {
+      if (cached) {
         try {
           const parsed = JSON.parse(cached);
           const pairs = Object.entries(parsed).map(([key, value]) => ({ key, value: String(value) }));
           setEnvPairs(pairs);
-          setRawText(pairs.map(p => `${p.key}=${p.value}`).join('\n'));
+          setRawText(formatPairsToEnvText(pairs));
           return;
         } catch (_) {}
       }
-      setEnvPairs(globalEnvPairs);
-      setRawText(globalEnvPairs.map(p => `${p.key}=${p.value}`).join('\n'));
+      setEnvPairs([]);
+      setRawText('');
       return;
     }
 
@@ -1060,30 +1105,13 @@ export default function EnvSetupView({
         value: String(value)
       }));
       setEnvPairs(pairs);
-      setRawText(pairs.map(p => `${p.key}=${p.value}`).join('\n'));
+      setRawText(formatPairsToEnvText(pairs));
     }
-  }, [activeTab, currentService, activeProfileKey, globalEnvPairs, activeGlobalProfile]);
+  }, [activeTab, currentService, activeProfileKey, activeGlobalProfile]);
 
-  // Parse Raw Text to Pairs
+  // In Raw mode: Keep text untouched on every keystroke so user can edit freely without cursor jumping
   const handleRawTextChange = (text) => {
     setRawText(text);
-    const lines = text.split('\n');
-    const parsed = [];
-    for (const line of lines) {
-      const clean = line.trim().replace(/^export\s+/, '');
-      if (!clean || clean.startsWith('#')) continue;
-      const eqIdx = clean.indexOf('=');
-      if (eqIdx !== -1) {
-        const k = clean.slice(0, eqIdx).trim();
-        const v = clean.slice(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
-        if (k) parsed.push({ key: k, value: v });
-      }
-    }
-    setEnvPairs(parsed);
-    persistDraft(parsed);
-    if (activeTab === 'global') {
-      setGlobalEnvPairs(parsed);
-    }
   };
 
   const handleTableValueChange = (index, val) => {
@@ -1135,6 +1163,17 @@ export default function EnvSetupView({
   };
 
   const handleCopyAllEnv = () => {
+    if (editorMode === 'raw') {
+      if (!rawText.trim()) {
+        setSaveStatus('⚠️ Không có nội dung để sao chép!');
+        setTimeout(() => setSaveStatus(''), 2000);
+        return;
+      }
+      navigator.clipboard.writeText(rawText);
+      setSaveStatus('✔ Đã sao chép nội dung .env vào Clipboard!');
+      setTimeout(() => setSaveStatus(''), 2500);
+      return;
+    }
     if (envPairs.length === 0) {
       setSaveStatus('⚠️ Không có biến nào để sao chép!');
       setTimeout(() => setSaveStatus(''), 2000);
@@ -1223,26 +1262,66 @@ export default function EnvSetupView({
   };
 
   const handleSave = async (restart = false) => {
+    let currentPairs = envPairs;
+    if (editorMode === 'raw') {
+      currentPairs = parseRawEnvText(rawText);
+      setEnvPairs(currentPairs);
+      if (activeTab === 'global') {
+        setGlobalEnvPairs(currentPairs);
+      }
+    }
+
     const overrides = {};
-    for (const p of envPairs) {
+    for (const p of currentPairs) {
       overrides[p.key] = p.value;
     }
 
-    persistDraft(envPairs);
+    persistDraft(currentPairs);
 
     if (activeTab === 'global') {
-      const res = await fetch(`${BASE_URL}/api/global-env`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ globalVars: overrides, profileKey: activeGlobalProfile })
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (data.globalProfiles) setGlobalProfiles(data.globalProfiles);
-        setGlobalEnvPairs(envPairs);
-        setSaveStatus(`✔ Đã lưu cấu hình Global Profile "${activeGlobalProfile}" & Tự động áp dụng cho các microservices!`);
+      try {
+        await ensureBackendRunning({ enableWsl: settings?.enableWsl, wslDistro: settings?.wslDistro });
+        const res = await fetch(`${BASE_URL}/api/global-env`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ globalVars: overrides, profileKey: activeGlobalProfile })
+        });
+        const data = await res.json();
+        if (data.success) {
+          if (data.globalProfiles) setGlobalProfiles(data.globalProfiles);
+          if (data.activeGlobalProfile) setActiveGlobalProfile(data.activeGlobalProfile);
+          const savedPairs = Object.entries(data.globalEnv || overrides).map(([k, v]) => ({ key: k, value: String(v) }));
+          setGlobalEnvPairs(savedPairs);
+          setEnvPairs(savedPairs);
+          if (editorMode !== 'raw') {
+            setRawText(formatPairsToEnvText(savedPairs));
+          }
+          setSaveStatus(`✔ Đã lưu cấu hình Global Profile "${activeGlobalProfile}" & Tự động áp dụng cho các microservices!`);
+          setTimeout(() => setSaveStatus(''), 3000);
+        } else {
+          setConfirmDialog({
+            isOpen: true,
+            title: 'Lỗi lưu cấu hình Global',
+            message: data?.error || 'Không thể lưu cấu hình Global Env.',
+            isAlert: true,
+            danger: true,
+            type: 'danger',
+            confirmText: 'Đã hiểu',
+            onConfirm: () => setConfirmDialog(null)
+          });
+        }
+      } catch (err) {
+        setConfirmDialog({
+          isOpen: true,
+          title: 'Lỗi kết nối Backend',
+          message: err?.message || String(err),
+          isAlert: true,
+          danger: true,
+          type: 'danger',
+          confirmText: 'Đã hiểu',
+          onConfirm: () => setConfirmDialog(null)
+        });
       }
-      setTimeout(() => setSaveStatus(''), 3000);
       return;
     }
 
@@ -1768,7 +1847,15 @@ export default function EnvSetupView({
               style={{ backgroundColor: currentThemeConfig.card, borderColor: currentThemeConfig.border }}
             >
               <button
-                onClick={() => setEditorMode('table')}
+                onClick={() => {
+                  if (editorMode === 'raw') {
+                    const parsed = parseRawEnvText(rawText);
+                    setEnvPairs(parsed);
+                    persistDraft(parsed);
+                    if (activeTab === 'global') setGlobalEnvPairs(parsed);
+                  }
+                  setEditorMode('table');
+                }}
                 className="px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                 style={{
                   backgroundColor: editorMode === 'table' ? `${accentColor}25` : 'transparent',
@@ -1779,7 +1866,12 @@ export default function EnvSetupView({
                 <span>Bảng</span>
               </button>
               <button
-                onClick={() => setEditorMode('raw')}
+                onClick={() => {
+                  if (editorMode === 'table') {
+                    setRawText(formatPairsToEnvText(envPairs));
+                  }
+                  setEditorMode('raw');
+                }}
                 className="px-3 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1"
                 style={{
                   backgroundColor: editorMode === 'raw' ? `${accentColor}25` : 'transparent',
@@ -1844,6 +1936,22 @@ export default function EnvSetupView({
               <FolderSync size={13} />
               <span>Backup/Restore</span>
             </button>
+
+            {activeTab !== 'global' && currentService && (
+              <button
+                onClick={() => onOpenTerminal && onOpenTerminal(currentService)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all flex items-center space-x-1.5 shadow-sm hover:text-white cursor-pointer"
+                style={{
+                  backgroundColor: currentThemeConfig.card,
+                  borderColor: currentThemeConfig.border,
+                  color: currentThemeConfig.textMuted
+                }}
+                title={`Mở Terminal tại ${currentService.name} (${currentService.cwd || 'mặc định'})`}
+              >
+                <Terminal size={13} style={{ color: accentColor }} />
+                <span>Mở Terminal</span>
+              </button>
+            )}
 
             <button
               onClick={() => handleSave(false)}

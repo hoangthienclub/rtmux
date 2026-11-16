@@ -22,7 +22,7 @@ portable-pty = "0.9.0"
 
 [profile.release]
 opt-level = "s"       # Tối ưu hóa kích thước và bộ nhớ RAM
-lto = true            # Link-time optimization thu nhỏ mã máy
-codegen-units = 1     # Tối ưu hóa toàn cục
+lto = false           # Tránh OOM killer trên WSL
+codegen-units = 16    # Biên dịch song song nhanh, tiết kiệm RAM
 panic = "abort"       # Giảm overhead runtime của unwinding
 strip = true          # Cắt bỏ toàn bộ debug symbols thừa

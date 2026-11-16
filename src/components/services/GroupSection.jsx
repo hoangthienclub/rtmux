@@ -15,6 +15,7 @@ export default function GroupSection({
   onTogglePopout,
   onStartGroup,
   onStopGroup,
+  onOpenTerminal,
   currentThemeConfig = {},
   accentColor = '#10b981'
 }) {
@@ -98,6 +99,7 @@ export default function GroupSection({
               onOpenEnvModal={onOpenEnvModal}
               onChangeProfile={onChangeProfile}
               onTogglePopout={onTogglePopout}
+              onOpenTerminal={onOpenTerminal}
               currentThemeConfig={currentThemeConfig}
               accentColor={accentColor}
             />

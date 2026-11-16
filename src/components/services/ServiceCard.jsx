@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Square, RotateCw, Settings, Trash2, ExternalLink } from 'lucide-react';
+import { Play, Square, RotateCw, Settings, Trash2, ExternalLink, Terminal } from 'lucide-react';
 import ServiceLogView from './ServiceLogView';
 
 export default function ServiceCard({
@@ -12,6 +12,7 @@ export default function ServiceCard({
   onOpenEnvModal,
   onChangeProfile,
   onTogglePopout,
+  onOpenTerminal,
   currentThemeConfig = {},
   accentColor = '#10b981'
 }) {
@@ -74,6 +75,14 @@ export default function ServiceCard({
           </div>
 
           <div className="flex items-center space-x-1">
+            <button
+              onClick={() => onOpenTerminal && onOpenTerminal(service)}
+              title={`Mở Terminal tại ${service.name}`}
+              className="p-1.5 rounded-lg transition-colors hover:text-white"
+              style={{ color: currentThemeConfig.textMuted || '#a1a1aa' }}
+            >
+              <Terminal size={14} />
+            </button>
             <button
               onClick={() => onOpenEnvModal(service)}
               title="Chỉnh sửa Biến Môi Trường (Env)"

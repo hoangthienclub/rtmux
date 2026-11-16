@@ -202,6 +202,7 @@ export default function ServiceMonitorView({
   onKillAll,
   onReloadServices,
   batchActionLoading = null,
+  onOpenTerminal,
   settings = {}
 }) {
   const currentThemeConfig = THEME_CONFIGS[settings?.surfaceTheme || 'zinc'] || THEME_CONFIGS.zinc;
@@ -213,6 +214,7 @@ export default function ServiceMonitorView({
   const [localActionLoading, setLocalActionLoading] = useState(null);
   const [filterKeyword, setFilterKeyword] = useState('');
   const [serviceSearch, setServiceSearch] = useState('');
+  const [isTerminalMenuOpen, setIsTerminalMenuOpen] = useState(false);
   const [selectedCategoryFilters, setSelectedCategoryFilters] = useState(() => {
     try {
       const saved = localStorage.getItem('service_tool_monitor_selected_categories');
@@ -974,6 +976,70 @@ export default function ServiceMonitorView({
                   <Settings size={12} />
                   <span>Config Env</span>
                 </button>
+
+                {/* Open Service Terminal */}
+                <div className="relative inline-flex items-center">
+                  <button
+                    onClick={() => onOpenTerminal && onOpenTerminal(selectedService, { withEnv: false })}
+                    className="flex items-center gap-1.5 h-8 px-3 rounded-l-xl text-xs font-medium border border-r-0 transition-all active:scale-95 hover:border-slate-500"
+                    style={{
+                      backgroundColor: currentThemeConfig.innerInput,
+                      borderColor: currentThemeConfig.border,
+                      color: currentThemeConfig.text
+                    }}
+                    title={`Mở Terminal tại thư mục của ${selectedService.name} (${selectedService.cwd || 'mặc định'})`}
+                  >
+                    <Terminal size={12} style={{ color: accentColor }} />
+                    <span>Terminal</span>
+                  </button>
+                  <button
+                    onClick={() => setIsTerminalMenuOpen(!isTerminalMenuOpen)}
+                    className="h-8 px-1.5 rounded-r-xl border text-xs transition-all active:scale-95 hover:border-slate-500 flex items-center justify-center"
+                    style={{
+                      backgroundColor: currentThemeConfig.innerInput,
+                      borderColor: currentThemeConfig.border,
+                      color: currentThemeConfig.textMuted
+                    }}
+                    title="Tùy chọn mở Terminal"
+                  >
+                    <ChevronDown size={12} />
+                  </button>
+
+                  {isTerminalMenuOpen && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setIsTerminalMenuOpen(false)} />
+                      <div 
+                        className="absolute right-0 top-9 z-50 w-56 rounded-xl border shadow-xl p-1 text-xs font-mono animate-in fade-in zoom-in-95 duration-100"
+                        style={{
+                          backgroundColor: currentThemeConfig.card,
+                          borderColor: currentThemeConfig.border,
+                          color: currentThemeConfig.text
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            setIsTerminalMenuOpen(false);
+                            onOpenTerminal && onOpenTerminal(selectedService, { withEnv: false });
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 transition-colors hover:bg-slate-500/10 cursor-pointer"
+                        >
+                          <Terminal size={12} style={{ color: accentColor }} />
+                          <span>Mở Terminal (Mặc định)</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsTerminalMenuOpen(false);
+                            onOpenTerminal && onOpenTerminal(selectedService, { withEnv: true });
+                          }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 transition-colors hover:bg-slate-500/10 cursor-pointer"
+                        >
+                          <Zap size={12} className="text-amber-400" />
+                          <span>Mở Terminal &amp; Nạp Env</span>
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1113,6 +1179,7 @@ export default function ServiceMonitorView({
                 }}
                 onStartGroup={onStartGroup}
                 onStopGroup={onStopGroup}
+                onOpenTerminal={onOpenTerminal}
                 currentThemeConfig={currentThemeConfig}
                 accentColor={accentColor}
               />
